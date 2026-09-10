@@ -1,0 +1,57 @@
+[tool.poetry]
+name = "controle-despesa"
+version = "0.1.0"
+description = "Controle de Despesa — gestao de despesas por centro de custo (UFC Engenharia)"
+authors = ["UFC Engenharia"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+flask = "^3.1.0"
+flask-sqlalchemy = "^3.1.1"
+flask-migrate = "^4.0.7"
+flask-wtf = "^1.2.2"
+flask-session = "^0.8.0"
+flask-limiter = "^3.9.2"
+flask-talisman = "^1.1.0"
+authlib = "^1.4.0"
+# O authlib.integrations.flask_client importa requests incondicionalmente, mas
+# o authlib o declara opcional. Ate agora ele vinha de carona com o Poetry, que
+# era instalado no mesmo site-packages — dependencia por acidente.
+requests = "^2.32.3"
+psycopg = {extras = ["binary"], version = "^3.2.3"}
+sqlalchemy = "^2.0.36"
+openpyxl = "^3.1.5"
+xlsxwriter = "^3.2.0"
+weasyprint = "^63.1"
+gunicorn = "^23.0.0"
+python-dotenv = "^1.0.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
+factory-boy = "^3.3.1"
+freezegun = "^1.5.1"
+ruff = "^0.8.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: testes puros, sem banco e sem app",
+    "integration: exercitam o app e o banco",
+]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["migrations/versions"]
+# O container roda como usuario sem privilegio; /tmp e gravavel, /app nem sempre.
+cache-dir = "/tmp/.ruff_cache"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
