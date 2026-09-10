@@ -1,0 +1,11 @@
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+postgres_data/
+postgres_data_prod/
+backups/*
+!backups/.gitkeep

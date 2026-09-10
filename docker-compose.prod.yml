@@ -1,0 +1,20 @@
+# Camada de PRODUCAO. Nao se usa sozinha:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# (e o que o `stack.ps1 -Prod` monta). O `-f` explicito tem um segundo efeito,
+# que e metade da razao deste arquivo existir: o Compose deixa de carregar o
+# docker-compose.override.yml sozinho — e aquele override e de DESENVOLVIMENTO.
+
+services:
+
+  db:
+    # Onde mora o banco na maquina de producao. Diretorio, e nao volume
+    # nomeado: e o mesmo arranjo do radar, e o que permite mover o projeto de
+    # pasta sem perder dado.
+    volumes:
+      - ./postgres_data_prod:/var/lib/postgresql/data
+
+  web:
+    environment:
+      APP_CONFIG: prod

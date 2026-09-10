@@ -1,0 +1,41 @@
+# Camada de DESENVOLVIMENTO — o Compose carrega sozinho.
+# O stack.ps1 -Prod passa -f explicito justamente para desligar este arquivo.
+
+services:
+
+  web:
+    build:
+      context: .
+      args:
+        INSTALL_DEV: "true"
+    environment:
+      APP_CONFIG: dev
+      TEST_DATABASE_URI: postgresql+psycopg://${POSTGRES_USER:-controle_despesa}:${POSTGRES_PASSWORD:-controle_despesa}@db-test:5432/${POSTGRES_DB_TEST:-controle_despesa_test}
+      FLASK_DEBUG: "1"
+    volumes:
+      - ./app:/app/app
+      - ./migrations:/app/migrations
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts:ro
+      - ./backups:/backups
+      # Config do pytest e do ruff: sem montar, valeria a copia da imagem.
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./wsgi.py:/app/wsgi.py:ro
+    command: ["flask", "run", "--host=0.0.0.0", "--port=8000", "--debug"]
+
+  # Banco da suite. Sem volume: comecar limpo a cada up e desejavel.
+  db-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-controle_despesa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-controle_despesa}
+      POSTGRES_DB: ${POSTGRES_DB_TEST:-controle_despesa_test}
+    networks:
+      - private
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-controle_despesa} -d ${POSTGRES_DB_TEST:-controle_despesa_test}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

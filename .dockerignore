@@ -1,0 +1,34 @@
+# O que NUNCA pode entrar na imagem
+# ---------------------------------
+# O .env foi parar dentro da imagem: quem tivesse a imagem teria o segredo do
+# client OIDC, a chave de sessao e a senha do banco. Apagar numa camada
+# posterior nao resolve — a camada anterior continua extraivel.
+.env
+.env.*
+!.env.exemplo
+
+# Dumps do banco: dados reais, e alguns com PII.
+backups/
+postgres_data/
+postgres_data_prod/
+*.sql
+*.dump
+*.sql.gz
+
+# Peso morto no contexto de build
+.git/
+.gitignore
+.gitattributes
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Nao vao para producao
+tests/
+docs/
+README.md
+docker-compose*.yml
