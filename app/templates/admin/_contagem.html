@@ -1,0 +1,7 @@
+<div class="aviso {% if quantidade %}atencao{% endif %}">
+  {% if quantidade %}
+    <strong>{{ quantidade | numero }}</strong> registro(s) seriam apagados de <strong>{{ alvo }}</strong>.
+  {% else %}
+    Nenhum registro se encaixa nesse filtro.
+  {% endif %}
+</div>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Relatório de despesas</title></head>
+<body>
+<main>
+  <header class="capa">
+    <h1>Controle de Despesa</h1>
+    <p class="legenda-pagina">{{ descricao_do_filtro }}</p>
+  </header>
+
+  <section class="indicadores">
+    <div class="indicador">
+      <div class="valor">{{ resumo.total_baixado | moeda }}</div>
+      <div class="rotulo">Total baixado</div>
+    </div>
+    <div class="indicador">
+      <div class="valor">{{ resumo.lancamentos | numero }}</div>
+      <div class="rotulo">Lançamentos</div>
+    </div>
+    <div class="indicador">
+      <div class="valor">{{ resumo.fornecedores | numero }}</div>
+      <div class="rotulo">Fornecedores</div>
+    </div>
+    <div class="indicador {% if resumo.divergentes %}atencao{% endif %}">
+      <div class="valor">{{ resumo.divergentes | numero }}</div>
+      <div class="rotulo">Divergências</div>
+    </div>
+  </section>
+
+  {% if grupos %}
+    <h2>Resumo por {{ titulo_do_grupo | lower }}</h2>
+    <table class="resumo">
+      <thead>
+        <tr>
+          <th>{{ titulo_do_grupo }}</th>
+          <th class="numero">Lanç.</th>
+          <th class="numero">Total</th>
+          <th class="numero">%</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linha in grupos %}
+          <tr class="subtotal">
+            <td>{{ linha.rotulo }}</td>
+            <td class="numero">{{ linha.quantidade | numero }}</td>
+            <td class="numero">{{ linha.total | moeda }}</td>
+            <td class="numero">
+              {{ '%.1f' | format(100 * (linha.total / resumo.total_baixado) if resumo.total_baixado else 0) }}%
+            </td>
+          </tr>
+        {% endfor %}
+        <tr class="total-geral">
+          <td>Total geral</td>
+          <td class="numero">{{ resumo.lancamentos | numero }}</td>
+          <td class="numero">{{ resumo.total_baixado | moeda }}</td>
+          <td class="numero">100,0%</td>
+        </tr>
+      </tbody>
+    </table>
+  {% endif %}
+
+  <h2>Lançamentos</h2>
+
+  {#
+    Em retrato as dez colunas nao cabem numa linha so. O historico — o unico
+    campo de tamanho imprevisivel — desce para uma segunda linha do registro,
+    que ocupa a largura toda. Nenhum campo se perde, e nada fica espremido.
+  #}
+  <table class="lancamentos">
+    <thead>
+      <tr>
+        <th class="c-data">Baixa</th>
+        <th class="c-data">Emissão</th>
+        <th class="c-ref">Ref.</th>
+        <th class="c-cc">CC</th>
+        <th class="c-doc">Documento</th>
+        <th class="c-forn">Fornecedor</th>
+        <th class="c-nat">Natureza</th>
+        <th class="c-valor numero">Original</th>
+        <th class="c-valor numero">Baixado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for despesa in despesas %}
+        <tr class="registro {% if not despesa.historico %}sozinho{% endif %}
+                   {% if despesa.divergente %}divergente{% endif %}">
+          <td>{{ despesa.data_baixa | data }}</td>
+          <td>{{ despesa.data_emissao | data }}</td>
+          <td>{{ despesa.referencia }}</td>
+          <td>{{ despesa.centro_custo.codigo }}</td>
+          <td>{{ despesa.documento }}</td>
+          <td>{{ despesa.fornecedor.nome }}</td>
+          <td>{{ despesa.natureza.nome }}</td>
+          <td class="numero">
+            {% if despesa.divergente %}<span class="marca-div">⚠</span> {% endif %}{{ despesa.valor_original | moeda }}
+          </td>
+          <td class="numero">{{ despesa.valor_baixado | moeda }}</td>
+        </tr>
+        {% if despesa.historico %}
+          <tr class="historico {% if despesa.divergente %}divergente{% endif %}">
+            <td colspan="9"><span class="etiqueta">Histórico</span> {{ despesa.historico }}</td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+      <tr class="total-geral">
+        <td colspan="7">Total — {{ resumo.lancamentos | numero }} lançamento{{ 's' if resumo.lancamentos != 1 }}</td>
+        <td class="numero">{{ resumo.total_original | moeda }}</td>
+        <td class="numero">{{ resumo.total_baixado | moeda }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  {% if resumo.divergentes %}
+    <p class="legenda-pagina nota">
+      ⚠ divergente: o valor baixado não coincide com o original.
+      {{ resumo.divergentes }} lançamento{{ 's' if resumo.divergentes != 1 }} nesta situação,
+      somando {{ (resumo.total_baixado - resumo.total_original) | moeda }} de diferença.
+    </p>
+  {% endif %}
+</main>
+</body>
+</html>

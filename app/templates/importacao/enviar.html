@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block titulo %}Importar · Controle de Despesa{% endblock %}
+
+{% block conteudo %}
+  <h1>Importar planilha</h1>
+  <p class="legenda-pagina">
+    O arquivo do ERP, em .xlsx. Nada é gravado no envio: a próxima tela mostra
+    exatamente o que vai entrar, e só então você confirma.
+  </p>
+
+  <div class="colunas-2">
+    <form class="cartao" method="post" action="{{ url_for('importacao.previa') }}"
+          enctype="multipart/form-data">
+      {{ form_csrf() }}
+      <h2>Envie o arquivo</h2>
+      <div class="campo">
+        <label for="planilha">Planilha</label>
+        <input type="file" id="planilha" name="planilha" accept=".xlsx" required>
+      </div>
+      <div class="acoes mt-p">
+        <button type="submit" class="botao-principal">Ver prévia</button>
+      </div>
+    </form>
+
+    <div class="cartao">
+      <h2>Antes de montar o arquivo</h2>
+      <p class="legenda-pagina sem-margem">
+        O modelo traz as colunas que o sistema espera, três lançamentos de exemplo
+        e uma aba explicando campo a campo. Baixe se estiver montando a planilha
+        do zero, ou em dúvida sobre algum campo.
+      </p>
+      <div class="acoes mt-p">
+        <a class="botao" href="{{ url_for('importacao.modelo') }}">Baixar modelo (.xlsx)</a>
+      </div>
+
+      <ul class="lista-notas">
+        <li>As colunas são lidas <strong>pelo nome</strong>, não pela posição — pode reordenar.</li>
+        <li>O cabeçalho pode estar em qualquer uma das 10 primeiras linhas.</li>
+        <li>Coluna a mais é ignorada; falta de coluna obrigatória recusa o arquivo.</li>
+        <li>As linhas de subtotal do Excel são descartadas na leitura.</li>
+        <li>Uma linha com problema fica de fora e aparece na prévia; as demais entram.</li>
+        <li>Reimportar o mesmo arquivo <strong>atualiza</strong> em vez de duplicar.</li>
+      </ul>
+    </div>
+  </div>
+{% endblock %}

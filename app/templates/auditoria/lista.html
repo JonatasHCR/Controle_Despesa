@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block titulo %}Auditoria · Controle de Despesa{% endblock %}
+
+{% block conteudo %}
+  <h1>Auditoria</h1>
+  <p class="legenda-pagina">
+    Registro do que foi feito no sistema. A trilha só recebe entradas — nada aqui é
+    editado nem apagado pela aplicação.
+  </p>
+
+  <form class="filtros" method="get">
+    <div class="campo">
+      <label for="acao">Ação</label>
+      <select id="acao" name="acao">
+        <option value="">todas</option>
+        {% for item in acoes %}
+          <option value="{{ item }}" {% if filtro_acao == item %}selected{% endif %}>{{ item }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="campo">
+      <label for="alvo_tipo">Alvo</label>
+      <select id="alvo_tipo" name="alvo_tipo">
+        <option value="">todos</option>
+        {% for item in tipos %}
+          <option value="{{ item }}" {% if filtro_tipo == item %}selected{% endif %}>{{ item }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="campo">
+      <label for="usuario">Pessoa</label>
+      <select id="usuario" name="usuario">
+        <option value="">todas</option>
+        {% for identificador, nome in pessoas.items() %}
+          <option value="{{ identificador }}"
+                  {% if filtro_usuario == identificador %}selected{% endif %}>{{ nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="botao-principal">Filtrar</button>
+    <a class="botao" href="{{ url_for('auditoria.lista') }}">Limpar</a>
+  </form>
+
+  <div class="cartao">
+    <div class="rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Quando</th>
+            <th>Quem</th>
+            <th>Ação</th>
+            <th>Alvo</th>
+            <th class="livre">Detalhes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entrada in pagina.items %}
+            <tr>
+              <td>{{ entrada.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td>{{ pessoas.get(entrada.usuario_id, '—') }}</td>
+              <td>{{ entrada.acao }}</td>
+              <td>{{ entrada.alvo_tipo }}{% if entrada.alvo_id %} #{{ entrada.alvo_id }}{% endif %}</td>
+              <td class="livre">
+                {% if entrada.payload %}
+                  {% for chave, valor in entrada.payload.items() %}
+                    <span class="selo">{{ chave }}: {{ valor }}</span>
+                  {% endfor %}
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="vazio">Nada registrado ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pagina.pages > 1 %}
+      <nav class="paginacao">
+        {% if pagina.has_prev %}
+          <a href="{{ url_for('auditoria.lista', pagina=pagina.prev_num, **query_base) }}">‹</a>
+        {% endif %}
+        <span class="atual">{{ pagina.page }}</span>
+        <span>de {{ pagina.pages }}</span>
+        {% if pagina.has_next %}
+          <a href="{{ url_for('auditoria.lista', pagina=pagina.next_num, **query_base) }}">›</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  </div>
+{% endblock %}

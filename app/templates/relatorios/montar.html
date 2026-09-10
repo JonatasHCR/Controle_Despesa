@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block titulo %}Relatórios · Controle de Despesa{% endblock %}
+
+{% block conteudo %}
+  <h1>Relatórios</h1>
+  <p class="legenda-pagina">
+    Escolha o recorte e o agrupamento. Os subtotais são calculados sobre o filtro —
+    só do agrupamento pedido, mais o total geral.
+  </p>
+
+  {% with acao = url_for('relatorios.montar'), detalhado = true, htmx = false %}
+    {% include 'despesas/_filtros.html' %}
+  {% endwith %}
+
+  <div class="cartao">
+    <h2>
+      {{ resumo.lancamentos | numero }} lançamento{{ 's' if resumo.lancamentos != 1 }}
+      · {{ resumo.total_baixado | moeda }}
+      {% if resumo.divergentes %}
+        <span class="selo divergente">⚠ {{ resumo.divergentes }} divergente{{ 's' if resumo.divergentes != 1 }}</span>
+      {% endif %}
+    </h2>
+
+    <div class="acoes mb">
+      <a class="botao botao-principal"
+         href="{{ url_for('relatorios.baixar', formato='pdf', **request.args) }}">Baixar PDF</a>
+      <a class="botao"
+         href="{{ url_for('relatorios.baixar', formato='xlsx', **request.args) }}">Baixar Excel</a>
+    </div>
+
+    {% if grupos %}
+      {% include 'despesas/_agrupado.html' %}
+    {% else %}
+      <p class="legenda-pagina">
+        Sem agrupamento o relatório sai como lista de lançamentos, com o total geral no rodapé.
+      </p>
+    {% endif %}
+  </div>
+{% endblock %}

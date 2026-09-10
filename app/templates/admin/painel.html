@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block titulo %}Administração · Controle de Despesa{% endblock %}
+
+{% block conteudo %}
+  <h1>Administração</h1>
+  <p class="legenda-pagina">Backup, restauração, limpeza e perfis de acesso.</p>
+
+  <div class="cartao mb">
+    <h2>Backups</h2>
+    <form method="post" action="{{ url_for('admin.criar_backup') }}" class="mb">
+      {{ form_csrf() }}
+      <button type="submit" class="botao-principal">Gerar backup agora</button>
+    </form>
+    <p class="legenda-pagina">
+      O sidecar também grava aqui, de {{ config.get('BACKUP_INTERVAL_HOURS', 24) }} em
+      {{ config.get('BACKUP_INTERVAL_HOURS', 24) }} horas. Os dois aparecem nesta lista.
+    </p>
+
+    <div class="rolagem">
+      <table>
+        <thead>
+          <tr><th>Arquivo</th><th>Quando</th><th class="numero">Tamanho</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for backup in backups %}
+            <tr>
+              <td>{{ backup.nome }}</td>
+              <td>{{ backup.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td class="numero">{{ (backup.bytes / 1024) | round | int | numero }} KB</td>
+              <td>
+                <a class="botao"
+                   href="{{ url_for('admin.baixar_backup', nome=backup.nome) }}">Baixar</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="vazio">Nenhum backup ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cartao mb">
+    <h2>Perfis de acesso</h2>
+    <p class="legenda-pagina">
+      Quem entra é decidido pelo grupo no Keycloak. O que a pessoa faz aqui dentro é
+      decidido nesta tabela.
+    </p>
+    <div class="rolagem">
+      <table>
+        <thead>
+          <tr><th>Pessoa</th><th>E-mail</th><th>Situação</th><th>Perfil</th></tr>
+        </thead>
+        <tbody>
+          {% for pessoa in pessoas %}
+            <tr>
+              <td>{{ pessoa.nome }}</td>
+              <td>{{ pessoa.email }}</td>
+              <td>
+                {% if pessoa.ativo %}
+                  <span class="selo">ativa</span>
+                {% else %}
+                  <span class="selo divergente">⚠ sem o grupo</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="post"
+                      action="{{ url_for('admin.mudar_perfil', identificador=pessoa.id) }}"
+                      class="acoes">
+                  {{ form_csrf() }}
+                  <select name="perfil" aria-label="Perfil de {{ pessoa.nome }}">
+                    {% for perfil in perfis %}
+                      <option value="{{ perfil }}"
+                              {% if pessoa.perfil == perfil %}selected{% endif %}>{{ perfil }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit">Salvar</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cartao mb">
+    <h2 class="titulo-perigo">Limpeza</h2>
+    <p class="legenda-pagina">
+      Confira a contagem antes de apagar. A palavra digitada protege contra o clique
+      errado — contra a intenção, o que vale é o backup.
+    </p>
+
+    <form method="post" action="{{ url_for('admin.limpeza') }}">
+      {{ form_csrf() }}
+      <div class="filtros">
+        <div class="campo">
+          <label for="alvo">O que apagar</label>
+          <select id="alvo" name="alvo">
+            {% for chave, rotulo in alvos.items() %}
+              <option value="{{ chave }}">{{ rotulo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="campo">
+          <label for="inicio">Baixa de</label>
+          <input type="date" id="inicio" name="inicio">
+        </div>
+        <div class="campo">
+          <label for="fim">até</label>
+          <input type="date" id="fim" name="fim">
+        </div>
+        <div class="campo">
+          <label for="centro">Centro de custo</label>
+          <select id="centro" name="centro">
+            <option value="">todos</option>
+            {% for codigo in opcoes.centros %}<option value="{{ codigo }}">{{ codigo }}</option>{% endfor %}
+          </select>
+        </div>
+        <button type="button" class="botao"
+                hx-post="{{ url_for('admin.contagem') }}"
+                hx-include="closest form"
+                hx-target="#contagem">Contar antes</button>
+      </div>
+
+      <div id="contagem" class="mt-p"></div>
+
+      <div class="filtros">
+        <div class="campo">
+          <label for="confirmacao-limpeza">Digite LIMPAR para confirmar</label>
+          <input type="text" id="confirmacao-limpeza" name="confirmacao" autocomplete="off">
+        </div>
+        <button type="submit" class="botao-perigo">Apagar</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="cartao">
+    <h2 class="titulo-perigo">Restauração</h2>
+    <p class="legenda-pagina">
+      Substitui o conteúdo do banco pelo do arquivo escolhido. Gere um backup antes.
+    </p>
+    <form method="post" action="{{ url_for('admin.restauracao') }}" class="filtros">
+      {{ form_csrf() }}
+      <div class="campo">
+        <label for="arquivo">Arquivo</label>
+        <select id="arquivo" name="arquivo">
+          {% for backup in backups %}
+            <option value="{{ backup.nome }}">
+              {{ backup.nome }} ({{ backup.criado_em.strftime('%d/%m %H:%M') }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="campo">
+        <label for="confirmacao-restauracao">Digite RESTAURAR para confirmar</label>
+        <input type="text" id="confirmacao-restauracao" name="confirmacao" autocomplete="off">
+      </div>
+      <button type="submit" class="botao-perigo" {% if not backups %}disabled{% endif %}>
+        Restaurar
+      </button>
+    </form>
+  </div>
+{% endblock %}

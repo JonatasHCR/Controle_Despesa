@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block titulo %}{{ 'Editar' if despesa else 'Nova' }} despesa · Controle de Despesa{% endblock %}
+
+{% block conteudo %}
+  <h1>{{ 'Editar despesa' if despesa else 'Nova despesa' }}</h1>
+  {% if despesa and despesa.importacao_id %}
+    <div class="aviso atencao">
+      Este lançamento veio de uma planilha. Reimportar o mesmo arquivo sobrescreve o que for editado aqui.
+    </div>
+  {% endif %}
+
+  <form method="post" class="cartao form-vertical">
+    {{ form_csrf() }}
+    <div class="filtros sem-margem">
+      <div class="campo">
+        <label for="referencia">Referência *</label>
+        <input type="number" id="referencia" name="referencia" required
+               value="{{ despesa.referencia if despesa else '' }}">
+      </div>
+      <div class="campo">
+        <label for="data_baixa">Data de baixa *</label>
+        <input type="date" id="data_baixa" name="data_baixa" required
+               value="{{ despesa.data_baixa.isoformat() if despesa and despesa.data_baixa else '' }}">
+      </div>
+      <div class="campo">
+        <label for="data_emissao">Data de emissão</label>
+        <input type="date" id="data_emissao" name="data_emissao"
+               value="{{ despesa.data_emissao.isoformat() if despesa and despesa.data_emissao else '' }}">
+      </div>
+      <div class="campo">
+        <label for="centro_custo">Centro de custo *</label>
+        <input type="text" id="centro_custo" name="centro_custo" required list="lista-centros"
+               value="{{ despesa.centro_custo.codigo if despesa and despesa.centro_custo else '' }}">
+      </div>
+      <div class="campo">
+        <label for="documento">Documento</label>
+        <input type="text" id="documento" name="documento"
+               value="{{ despesa.documento if despesa else '' }}">
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="fornecedor">Fornecedor *</label>
+      <input type="text" id="fornecedor" name="fornecedor" required list="lista-fornecedores"
+             value="{{ despesa.fornecedor.nome if despesa and despesa.fornecedor else '' }}">
+    </div>
+
+    <div class="campo">
+      <label for="natureza">Natureza *</label>
+      <input type="text" id="natureza" name="natureza" required list="lista-naturezas"
+             value="{{ despesa.natureza.nome if despesa and despesa.natureza else '' }}">
+    </div>
+
+    <div class="campo">
+      <label for="historico">Histórico</label>
+      <textarea id="historico" name="historico" rows="2">{{ despesa.historico if despesa else '' }}</textarea>
+    </div>
+
+    <div class="filtros sem-margem">
+      <div class="campo">
+        <label for="valor_original">Valor original</label>
+        <input type="text" id="valor_original" name="valor_original" inputmode="decimal"
+               value="{{ despesa.valor_original if despesa else '' }}">
+      </div>
+      <div class="campo">
+        <label for="valor_baixado">Valor baixado *</label>
+        <input type="text" id="valor_baixado" name="valor_baixado" inputmode="decimal" required
+               value="{{ despesa.valor_baixado if despesa else '' }}">
+      </div>
+    </div>
+    <p class="legenda-pagina sem-margem">
+      Deixando o original em branco, ele recebe o mesmo valor do baixado. Valores diferentes
+      marcam o lançamento como divergente.
+    </p>
+
+    <div class="acoes">
+      <button type="submit" class="botao-principal">Salvar</button>
+      <a class="botao" href="{{ url_for('despesas.lista', **request.args) }}">Cancelar</a>
+    </div>
+  </form>
+
+  {% if despesa %}
+    <form method="post" action="{{ url_for('despesas.excluir', identificador=despesa.id) }}"
+          class="mt-p"
+          data-confirmar="Excluir a despesa {{ despesa.referencia }}? A ação fica registrada na auditoria.">
+      {{ form_csrf() }}
+      <button type="submit" class="botao-perigo">Excluir</button>
+    </form>
+  {% endif %}
+
+  <datalist id="lista-centros">
+    {% for codigo in listas.centros %}<option value="{{ codigo }}">{% endfor %}
+  </datalist>
+  <datalist id="lista-fornecedores">
+    {% for nome in listas.fornecedores %}<option value="{{ nome }}">{% endfor %}
+  </datalist>
+  <datalist id="lista-naturezas">
+    {% for nome in listas.naturezas %}<option value="{{ nome }}">{% endfor %}
+  </datalist>
+{% endblock %}

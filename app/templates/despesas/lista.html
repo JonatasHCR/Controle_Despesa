@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block titulo %}Despesas · Controle de Despesa{% endblock %}
+
+{% block conteudo %}
+  <div class="cabecalho-pagina">
+    <div>
+      <h1>Despesas</h1>
+      <p class="legenda-pagina">Todo campo é filtrável, e o recorte fica na URL.</p>
+    </div>
+    <div class="acoes">
+      {% if usuario.pode_escrever %}
+        <a class="botao botao-principal" href="{{ url_for('despesas.nova') }}">Nova despesa</a>
+      {% endif %}
+      <a class="botao" href="{{ url_for('relatorios.baixar', formato='xlsx', **request.args) }}">Excel</a>
+      <a class="botao" href="{{ url_for('relatorios.baixar', formato='pdf', **request.args) }}">PDF</a>
+    </div>
+  </div>
+
+  {% with acao = url_for('despesas.lista'), detalhado = true, htmx = true %}
+    {% include 'despesas/_filtros.html' %}
+  {% endwith %}
+
+  {% include 'despesas/_resultado.html' %}
+{% endblock %}

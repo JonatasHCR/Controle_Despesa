@@ -1,0 +1,111 @@
+{# Largura fixa por coluna e reticências nos campos de texto: os onze campos
+   cabem na tela sem barra lateral. O valor inteiro fica no `title`. #}
+<div class="rolagem">
+  <table class="lancamentos">
+    <thead>
+      <tr>
+        <th class="c-data">Baixa</th>
+        <th class="c-data">Emissão</th>
+        <th class="c-ref">Ref.</th>
+        <th class="c-cc">CC</th>
+        <th class="c-doc">Documento</th>
+        <th class="c-forn">Fornecedor</th>
+        <th class="c-nat">Natureza</th>
+        <th class="c-hist">Histórico</th>
+        <th class="c-valor numero">Original</th>
+        <th class="c-valor numero">Baixado</th>
+        <th class="c-situacao numero">Situação</th>
+        {% if usuario.pode_escrever %}
+          <th class="c-acao so-tela"><span class="oculto">Ações</span></th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for despesa in pagina.items %}
+        <tr {% if despesa.divergente %}class="linha-divergente"{% endif %}>
+          <td>{{ despesa.data_baixa | data }}</td>
+          <td class="discreto">{{ despesa.data_emissao | data }}</td>
+          <td>{{ despesa.referencia }}</td>
+          <td>{{ despesa.centro_custo.codigo }}</td>
+          <td class="corta" title="{{ despesa.documento }}">{{ despesa.documento }}</td>
+          <td class="corta" title="{{ despesa.fornecedor.nome }}">{{ despesa.fornecedor.nome }}</td>
+          <td class="corta" title="{{ despesa.natureza.nome }}">{{ despesa.natureza.nome }}</td>
+          <td class="corta discreto" title="{{ despesa.historico }}">{{ despesa.historico }}</td>
+          <td class="numero">
+            {% if despesa.divergente %}
+              <span class="valor-divergente">{{ despesa.valor_original | moeda }}</span>
+            {% else %}
+              {{ despesa.valor_original | moeda }}
+            {% endif %}
+          </td>
+          <td class="numero forte">
+            {% if despesa.divergente %}
+              <span class="valor-divergente">{{ despesa.valor_baixado | moeda }}</span>
+            {% else %}
+              {{ despesa.valor_baixado | moeda }}
+            {% endif %}
+          </td>
+          <td class="numero c-situacao">
+            {% if despesa.divergente %}
+              <span class="selo-diferenca"
+                    title="Original e baixado divergem em {{ despesa.diferenca | moeda }}">
+                ⚠ <span class="num">{{ despesa.diferenca | sinal }}</span>
+              </span>
+            {% else %}
+              <span class="sem-nota">—</span>
+            {% endif %}
+          </td>
+          {% if usuario.pode_escrever %}
+            <td class="c-acao so-tela">
+              <div class="acoes-da-linha">
+                <a class="botao botao-mini"
+                   href="{{ url_for('despesas.editar', identificador=despesa.id) }}"
+                   title="Editar a despesa {{ despesa.referencia }}"
+                   aria-label="Editar a despesa {{ despesa.referencia }}">Editar</a>
+                {# A confirmação vem do acoes.js: handler inline não roda sob a CSP. #}
+                <form method="post"
+                      action="{{ url_for('despesas.excluir', identificador=despesa.id, **query_base) }}"
+                      data-confirmar="Excluir a despesa {{ despesa.referencia }} — {{ despesa.fornecedor.nome }}, {{ despesa.valor_baixado | moeda }}? A ação fica registrada na auditoria.">
+                  {{ form_csrf() }}
+                  <button type="submit" class="botao botao-mini botao-excluir"
+                          title="Excluir a despesa {{ despesa.referencia }}"
+                          aria-label="Excluir a despesa {{ despesa.referencia }}">Excluir</button>
+                </form>
+              </div>
+            </td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="{{ 12 if usuario.pode_escrever else 11 }}" class="vazio">
+            Nenhuma despesa para este filtro.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pagina.pages > 1 %}
+  <nav class="paginacao" aria-label="Paginação">
+    {% if pagina.has_prev %}
+      <a href="{{ url_for(request.endpoint, pagina=pagina.prev_num, **query_base) }}"
+         aria-label="Página anterior">‹</a>
+    {% endif %}
+    {% for numero in pagina.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+      {% if numero %}
+        {% if numero == pagina.page %}
+          <span class="atual" aria-current="page">{{ numero }}</span>
+        {% else %}
+          <a href="{{ url_for(request.endpoint, pagina=numero, **query_base) }}">{{ numero }}</a>
+        {% endif %}
+      {% else %}
+        <span class="reticencias">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if pagina.has_next %}
+      <a href="{{ url_for(request.endpoint, pagina=pagina.next_num, **query_base) }}"
+         aria-label="Próxima página">›</a>
+    {% endif %}
+  </nav>
+{% endif %}

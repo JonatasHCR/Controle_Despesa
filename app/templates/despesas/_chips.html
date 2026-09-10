@@ -1,0 +1,16 @@
+{# O recorte ativo em uma linha, cada pedaço removível com um clique. #}
+{% if chips %}
+  <div class="chips">
+    <span class="rotulo-recorte">Recorte:</span>
+    {% for chip in chips %}
+      <span class="chip">
+        <span class="campo-do-chip">{{ chip.rotulo }}</span>
+        {% if chip.valor %}<span class="valor-do-chip">{{ chip.valor }}</span>{% endif %}
+        <a class="tirar" href="{{ url_for(request.endpoint, **chip.sem) }}"
+           title="Tirar o filtro de {{ chip.rotulo | lower }}"
+           aria-label="Tirar o filtro de {{ chip.rotulo | lower }}">×</a>
+      </span>
+    {% endfor %}
+    <a class="limpar-tudo" href="{{ url_for(request.endpoint) }}">limpar tudo</a>
+  </div>
+{% endif %}

@@ -1,0 +1,118 @@
+{# Formulario de filtro. GET, para o recorte ficar na URL e poder ser copiado.
+
+   Natureza, centro de custo e fornecedor sao input + datalist, e nao select:
+   com 33 fornecedores, um combo obriga a rolar a lista atras do nome. O
+   datalist filtra enquanto se digita, e nao custa biblioteca nenhuma. Quem
+   digita so um pedaco tambem acha — a resolucao esta em consulta.py. #}
+<form class="filtros" method="get" action="{{ acao }}"
+      {% if htmx %}hx-get="{{ acao }}" hx-target="#resultado" hx-push-url="true"
+                   hx-trigger="submit, change from:select, change from:input[type=checkbox]"{% endif %}>
+
+  <div class="campo campo-data">
+    <label for="campo_data">Data</label>
+    <select id="campo_data" name="campo_data">
+      <option value="data_baixa" {% if filtro.campo_data == 'data_baixa' %}selected{% endif %}>Baixa</option>
+      <option value="data_emissao" {% if filtro.campo_data == 'data_emissao' %}selected{% endif %}>Emissão</option>
+    </select>
+  </div>
+
+  <div class="campo campo-data">
+    <label for="inicio">De</label>
+    <input type="date" id="inicio" name="inicio"
+           value="{{ filtro.inicio.isoformat() if filtro.inicio else '' }}">
+  </div>
+
+  <div class="campo campo-data">
+    <label for="fim">Até</label>
+    <input type="date" id="fim" name="fim"
+           value="{{ filtro.fim.isoformat() if filtro.fim else '' }}">
+  </div>
+
+  <div class="campo campo-curto">
+    <label for="centro">Centro de custo</label>
+    <input type="search" id="centro" name="centro" list="opcoes-centro"
+           placeholder="todos" autocomplete="off"
+           value="{{ termo('centro') }}">
+    <datalist id="opcoes-centro">
+      {% for codigo in opcoes.centros %}<option value="{{ codigo }}">{% endfor %}
+    </datalist>
+  </div>
+
+  <div class="campo campo-medio">
+    <label for="natureza">Natureza</label>
+    <input type="search" id="natureza" name="natureza" list="opcoes-natureza"
+           placeholder="todas" autocomplete="off"
+           value="{{ termo('natureza') }}">
+    <datalist id="opcoes-natureza">
+      {% for nome in opcoes.naturezas %}<option value="{{ nome }}">{% endfor %}
+    </datalist>
+  </div>
+
+  <div class="campo campo-medio">
+    <label for="fornecedor">Fornecedor</label>
+    <input type="search" id="fornecedor" name="fornecedor" list="opcoes-fornecedor"
+           placeholder="todos" autocomplete="off"
+           value="{{ termo('fornecedor') }}">
+    <datalist id="opcoes-fornecedor">
+      {% for nome in opcoes.fornecedores %}<option value="{{ nome }}">{% endfor %}
+    </datalist>
+  </div>
+
+  <div class="campo campo-largo">
+    <label for="busca">Buscar</label>
+    <input type="search" id="busca" name="busca" value="{{ filtro.busca }}"
+           placeholder="referência, histórico, documento ou fornecedor" autocomplete="off">
+  </div>
+
+  {% if detalhado %}
+    <div class="campo campo-curto">
+      <label for="documento">Documento</label>
+      <input type="search" id="documento" name="documento" value="{{ filtro.documento }}"
+             autocomplete="off">
+    </div>
+
+    <div class="campo campo-curto">
+      <label for="referencia">Referência</label>
+      <input type="search" id="referencia" name="referencia" inputmode="numeric"
+             placeholder="inteira ou parte" autocomplete="off"
+             value="{{ termo('referencia') }}">
+    </div>
+
+    <div class="campo campo-curto">
+      <label for="valor_minimo">Valor de</label>
+      <input type="text" id="valor_minimo" name="valor_minimo" inputmode="decimal"
+             value="{{ filtro.valor_minimo or '' }}">
+    </div>
+
+    <div class="campo campo-curto">
+      <label for="valor_maximo">Valor até</label>
+      <input type="text" id="valor_maximo" name="valor_maximo" inputmode="decimal"
+             value="{{ filtro.valor_maximo or '' }}">
+    </div>
+
+    <div class="campo campo-curto">
+      <label for="agrupar">Agrupar por</label>
+      <select id="agrupar" name="agrupar">
+        <option value="">nenhum</option>
+        {% for chave, rotulo in [('natureza','Natureza'), ('fornecedor','Fornecedor'),
+                                 ('centro','Centro de custo'), ('mes','Mês'), ('dia','Dia')] %}
+          <option value="{{ chave }}" {% if agrupamento == chave %}selected{% endif %}>{{ rotulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endif %}
+
+  <div class="campo">
+    <label for="divergentes">&nbsp;</label>
+    <label class="selo">
+      <input type="checkbox" id="divergentes" name="divergentes" value="1"
+             {% if filtro.somente_divergentes %}checked{% endif %}>
+      só divergentes
+    </label>
+  </div>
+
+  <div class="campo acoes-filtro">
+    <button type="submit" class="botao-principal">Filtrar</button>
+    <a class="botao" href="{{ acao }}">Limpar</a>
+  </div>
+</form>

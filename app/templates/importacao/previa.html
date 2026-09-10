@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block titulo %}Prévia da importação · Controle de Despesa{% endblock %}
+
+{% block conteudo %}
+  <h1>Prévia da importação</h1>
+  <p class="legenda-pagina">{{ previa.arquivo }} — nada foi gravado ainda.</p>
+
+  {% if previa.ja_importado %}
+    <div class="aviso atencao">
+      Este arquivo já foi importado em
+      {{ previa.ja_importado.criado_em.strftime('%d/%m/%Y às %H:%M') }}.
+      Importar de novo sobrescreve os lançamentos com o conteúdo da planilha.
+    </div>
+  {% endif %}
+
+  <section class="indicadores">
+    <div class="indicador">
+      <div class="valor">{{ previa.linhas | length | numero }}</div>
+      <div class="rotulo">Lançamentos lidos</div>
+    </div>
+    <div class="indicador">
+      <div class="valor">{{ previa.a_criar | numero }}</div>
+      <div class="rotulo">A criar</div>
+    </div>
+    <div class="indicador">
+      <div class="valor">{{ previa.a_atualizar | numero }}</div>
+      <div class="rotulo">A atualizar</div>
+    </div>
+    <div class="indicador {% if previa.divergentes %}atencao{% endif %}">
+      <div class="valor">{{ previa.divergentes | numero }}</div>
+      <div class="rotulo">Divergências</div>
+    </div>
+  </section>
+
+  <div class="cartao">
+    <h2>O que a planilha traz</h2>
+    <table>
+      <tbody>
+        <tr><td>Total baixado</td><td class="numero">{{ previa.total_baixado | moeda }}</td></tr>
+        <tr><td>Total original</td><td class="numero">{{ previa.total_original | moeda }}</td></tr>
+        <tr><td>Linhas de subtotal ignoradas</td>
+            <td class="numero">{{ previa.ignoradas | numero }}</td></tr>
+        <tr><td>Fornecedores novos</td>
+            <td class="numero">{{ previa.novos_fornecedores | length | numero }}</td></tr>
+        <tr><td>Naturezas novas</td>
+            <td class="numero">{{ previa.novas_naturezas | length | numero }}</td></tr>
+        <tr><td>Centros de custo novos</td>
+            <td class="numero">{{ previa.novos_centros | length | numero }}</td></tr>
+      </tbody>
+    </table>
+
+    {% if previa.novas_naturezas %}
+      <p class="legenda-pagina mt-p">
+        Naturezas novas: {{ previa.novas_naturezas | join(', ') }}
+      </p>
+    {% endif %}
+  </div>
+
+  {% if previa.erros %}
+    <div class="cartao mt-p">
+      <h2>{{ previa.erros | length }} linha(s) com problema — ficam de fora</h2>
+      <div class="rolagem">
+        <table>
+          <thead><tr><th>Linha</th><th>Campo</th><th>Problema</th></tr></thead>
+          <tbody>
+            {% for erro in previa.erros[:50] %}
+              <tr>
+                <td>{{ erro.linha }}</td>
+                <td>{{ erro.campo }}</td>
+                <td class="livre">{{ erro.mensagem }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if previa.erros | length > 50 %}
+        <p class="legenda-pagina">Mostrando as 50 primeiras.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('importacao.confirmar') }}"
+        class="acoes mt">
+    {{ form_csrf() }}
+    <button type="submit" class="botao-principal" {% if not previa.linhas %}disabled{% endif %}>
+      Confirmar importação
+    </button>
+    <a class="botao" href="{{ url_for('importacao.enviar') }}">Cancelar</a>
+  </form>
+{% endblock %}

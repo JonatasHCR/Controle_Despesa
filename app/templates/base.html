@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Controle de Despesa{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="{{ url_for('static', filename='js/tema.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/acoes.js') }}" defer></script>
+</head>
+<body>
+
+{% if usuario %}
+<header class="topo">
+  <a class="marca" href="{{ url_for('despesas.painel') }}">Controle de Despesa</a>
+
+  <nav>
+    <a href="{{ url_for('despesas.painel') }}"
+       {% if secao == 'painel' %}aria-current="page"{% endif %}>Painel</a>
+    <a href="{{ url_for('despesas.lista') }}"
+       {% if secao == 'despesas' %}aria-current="page"{% endif %}>Despesas</a>
+    <a href="{{ url_for('relatorios.montar') }}"
+       {% if secao == 'relatorios' %}aria-current="page"{% endif %}>Relatórios</a>
+    {% if usuario.pode_escrever %}
+      <a href="{{ url_for('importacao.enviar') }}"
+         {% if secao == 'importacao' %}aria-current="page"{% endif %}>Importar</a>
+    {% endif %}
+    {% if usuario.pode_administrar %}
+      <a href="{{ url_for('auditoria.lista') }}"
+         {% if secao == 'auditoria' %}aria-current="page"{% endif %}>Auditoria</a>
+      <a href="{{ url_for('admin.painel') }}"
+         {% if secao == 'admin' %}aria-current="page"{% endif %}>Administração</a>
+    {% endif %}
+  </nav>
+
+  <div class="direita">
+    {% if outros_sistemas %}
+      <select data-ir-para aria-label="Ir para outro sistema">
+        <option value="">Sistemas…</option>
+        {% for sistema in outros_sistemas %}
+          <option value="{{ sistema.url }}">{{ sistema.nome }}</option>
+        {% endfor %}
+      </select>
+    {% endif %}
+    <button type="button" id="alternar-tema" title="Alternar tema">◐</button>
+    <span class="pessoa">{{ usuario.nome }}</span>
+    <a class="botao" href="{{ url_for('auth.logout') }}">Sair</a>
+  </div>
+</header>
+{% endif %}
+
+<main>
+  {% with mensagens = get_flashed_messages(with_categories=true) %}
+    {% for categoria, mensagem in mensagens %}
+      <div class="aviso {{ categoria }}">{{ mensagem }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  {% block conteudo %}{% endblock %}
+</main>
+
+</body>
+</html>

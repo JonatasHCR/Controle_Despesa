@@ -1,0 +1,22 @@
+<div id="resultado" class="cartao some-carregando">
+  <div class="cartao-topo">
+    <div class="resumo-recorte">
+      <span class="total">{{ resumo.total_baixado | moeda }}</span>
+      <span class="contagem">
+        em {{ resumo.lancamentos | numero }} lançamento{{ 's' if resumo.lancamentos != 1 }}
+      </span>
+      {% if resumo.divergentes %}
+        <span class="selo divergente">
+          ⚠ {{ resumo.divergentes }} divergente{{ 's' if resumo.divergentes != 1 }}
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if grupos %}
+    {% include 'despesas/_agrupado.html' %}
+    <h2 class="mt">Lançamentos</h2>
+  {% endif %}
+
+  {% include 'despesas/_tabela.html' %}
+</div>

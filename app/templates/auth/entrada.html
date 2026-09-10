@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block titulo %}Entrar · Controle de Despesa{% endblock %}
+
+{% block conteudo %}
+  <div class="cartao cartao-centro">
+    <h1>Controle de Despesa</h1>
+    <p class="legenda-pagina">O acesso é o mesmo dos outros sistemas.</p>
+    <a class="botao botao-principal" href="{{ url_for('auth.login') }}">Entrar</a>
+  </div>
+{% endblock %}
