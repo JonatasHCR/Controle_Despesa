@@ -94,13 +94,16 @@ def resolver_arquivo(nome: str) -> Path:
 
 def gerar_backup() -> Path:
     conexao = _conexao()
-    destino = diretorio() / f"controle_despesa_{datetime.now():%Y%m%d_%H%M%S}.dump"
+    destino = diretorio() / f"controle_despesa_{datetime.now():%Y%m%d_%H%M%S}.sql"
+    # Texto puro, o mesmo formato do sidecar. --clean/--if-exists embutem os
+    # DROP no arquivo, que e o que permite restaurar por cima de banco povoado.
     comando = [
         "pg_dump",
         "-h", conexao["host"],
         "-p", conexao["porta"],
         "-U", conexao["usuario"],
-        "-Fc",
+        "--clean",
+        "--if-exists",
         "--no-owner",
         "--no-privileges",
         "-f", str(destino),

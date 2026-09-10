@@ -67,7 +67,7 @@ def test_listagem_ignora_arquivo_que_nao_e_backup(app, backups):
 def test_backup_gera_arquivo_com_conteudo(entrar, admin, carregado, backups):
     resposta = entrar(admin).post("/administracao/backups", follow_redirects=True)
     assert resposta.status_code == 200
-    arquivos = list(backups.glob("*.dump"))
+    arquivos = list(backups.glob("*.sql"))
     assert len(arquivos) == 1
     assert arquivos[0].stat().st_size > 1000
 
@@ -84,7 +84,7 @@ def test_backup_e_auditado(entrar, admin, carregado, backups, db):
 def test_backup_pode_ser_baixado(entrar, admin, carregado, backups):
     cliente = entrar(admin)
     cliente.post("/administracao/backups", follow_redirects=True)
-    nome = next(backups.glob("*.dump")).name
+    nome = next(backups.glob("*.sql")).name
     resposta = cliente.get(f"/administracao/backups/{nome}")
     assert resposta.status_code == 200
     assert "attachment" in resposta.headers["Content-Disposition"]
@@ -209,7 +209,7 @@ def test_operador_nao_limpa(entrar, operador, carregado, db):
 def test_restauracao_sem_a_palavra_nao_roda(entrar, admin, carregado, backups, db):
     cliente = entrar(admin)
     cliente.post("/administracao/backups", follow_redirects=True)
-    nome = next(backups.glob("*.dump")).name
+    nome = next(backups.glob("*.sql")).name
 
     cliente.post(
         "/administracao/limpeza",
