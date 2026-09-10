@@ -52,7 +52,10 @@ RUN groupadd --gid 10001 despesa \
 WORKDIR /app
 COPY --chown=despesa:despesa . .
 
-RUN chmod +x /app/entrypoint.sh \
+# sed: um checkout no Windows grava o .sh com CRLF, o shebang vira `/bin/sh\r`
+# e o Docker reporta isso como se o entrypoint nao existisse.
+RUN sed -i 's/\r$//' /app/entrypoint.sh \
+    && chmod +x /app/entrypoint.sh \
     && mkdir -p /backups \
     && chown despesa:despesa /backups
 

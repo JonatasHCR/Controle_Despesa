@@ -1,0 +1,6 @@
+# Scripts executados em Linux/containers DEVEM usar LF, mesmo com
+# core.autocrlf=true no Windows. Com CRLF o shebang vira "/bin/sh\r" e o Docker
+# reporta como se o entrypoint nao existisse.
+*.sh         text eol=lf
+Dockerfile*  text eol=lf
+entrypoint.sh text eol=lf
