@@ -17,6 +17,8 @@ from flask import (
     url_for,
 )
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.auth.guardas import requer, usuario_atual
 from app.extensions import db, limiter
 from app.importacao.servico import analisar, gravar
@@ -95,6 +97,17 @@ def confirmar():
         importacao = gravar(db.session, resultado, usuario=usuario_atual())
     except ValueError as erro:
         flash(str(erro), "erro")
+        return redirect(url_for("importacao.enviar"))
+    except SQLAlchemyError:
+        # Sem o rollback a sessao fica inutilizavel e o proximo uso dela
+        # levanta PendingRollbackError, longe da causa.
+        db.session.rollback()
+        current_app.logger.exception("importacao falhou ao gravar")
+        flash(
+            "A gravação falhou e nada foi importado. Confira se a planilha tem "
+            "referências repetidas e tente de novo.",
+            "erro",
+        )
         return redirect(url_for("importacao.enviar"))
     finally:
         caminho.unlink(missing_ok=True)

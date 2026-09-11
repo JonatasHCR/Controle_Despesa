@@ -26,7 +26,7 @@ ORDENS = {
     "documento": Despesa.documento,
 }
 
-AGRUPAMENTOS = ("natureza", "fornecedor", "centro", "mes", "dia")
+AGRUPAMENTOS = ("natureza", "fornecedor", "centro", "ano", "mes", "dia")
 
 ZERO = Decimal("0.00")
 
@@ -136,6 +136,8 @@ def _eixo(por: str, filtro: Filtro):
         return Fornecedor.nome, Despesa.fornecedor, False
     if por == "centro":
         return CentroCusto.codigo, Despesa.centro_custo, False
+    if por == "ano":
+        return func.to_char(filtro.coluna_de_data, "YYYY"), None, True
     if por == "mes":
         return func.to_char(filtro.coluna_de_data, "MM/YYYY"), None, True
     return func.to_char(filtro.coluna_de_data, "DD/MM/YYYY"), None, True

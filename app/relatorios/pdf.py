@@ -88,8 +88,18 @@ _PAGINA = """
 
 body { font-size: 8.5pt; }
 
-.capa { margin-bottom: 10mm; }
-.capa h1 { font-size: 16pt; margin-bottom: 2mm; }
+.capa {
+    margin-bottom: 8mm;
+    padding-bottom: 2.5mm;
+    border-bottom: 0.5pt solid #d3d6db;
+}
+.capa .marca {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #a61c21;
+    margin-bottom: 1mm;
+}
+.capa h1 { font-size: 13pt; margin: 0 0 1.5mm; }
 
 /* Os quatro indicadores em linha, sem cartao: em papel a borda so gasta tinta. */
 .indicadores { display: flex; gap: 6mm; margin-bottom: 8mm; }
@@ -110,16 +120,16 @@ table { font-size: 8pt; width: 100%; }
 th, td { padding: 1.2mm 1.5mm; }
 th { font-size: 6.5pt; }
 
-/* Larguras fixas: sem elas o navegador do WeasyPrint distribui pelo conteudo e
-   uma linha com fornecedor longo desloca a tabela inteira. */
+/* Com table-layout fixed + width 100% as larguras valem como proporcao. A do
+   valor era estreita demais e o total quebrava no meio do numero. */
 .lancamentos { table-layout: fixed; }
 .c-data  { width: 16mm; }
 .c-ref   { width: 13mm; }
 .c-cc    { width: 9mm; }
 .c-doc   { width: 20mm; }
-.c-forn  { width: 41mm; }
-.c-nat   { width: 34mm; }
-.c-valor { width: 21mm; }
+.c-forn  { width: 37mm; }
+.c-nat   { width: 30mm; }
+.c-valor { width: 24mm; }
 
 .lancamentos td { white-space: normal; word-wrap: break-word; }
 

@@ -138,7 +138,35 @@ def ler(origem) -> Resultado:
 
         _ler_linha(numero, celulas, mapa, resultado)
 
+    _rejeitar_referencias_repetidas(resultado)
     return resultado
+
+
+def _rejeitar_referencias_repetidas(resultado: Resultado) -> None:
+    """REFERENCIA e unica no banco: duas linhas com a mesma quebrariam a
+    gravacao inteira no commit, e o erro sairia como 500."""
+    vistas: dict[int, int] = {}
+    repetidas: set[int] = set()
+    for linha in resultado.linhas:
+        if linha.referencia in vistas:
+            repetidas.add(linha.referencia)
+            resultado.erros.append(
+                ErroLinha(
+                    linha=linha.linha,
+                    campo="REFERENCIA",
+                    mensagem=(
+                        f"referência {linha.referencia} repetida "
+                        f"(já apareceu na linha {vistas[linha.referencia]})"
+                    ),
+                )
+            )
+        else:
+            vistas[linha.referencia] = linha.linha
+
+    if repetidas:
+        resultado.linhas = [
+            linha for linha in resultado.linhas if linha.referencia not in repetidas
+        ]
 
 
 def _abrir(origem):

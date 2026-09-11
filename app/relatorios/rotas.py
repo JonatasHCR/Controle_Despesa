@@ -14,6 +14,7 @@ from app.despesas.consulta import (
     chips_do_filtro,
     filtro_da_query,
     opcoes,
+    query_sem,
 )
 from app.despesas.filtros import agrupar, aplicar, totais
 from app.extensions import db, limiter
@@ -27,6 +28,7 @@ TITULOS = {
     "natureza": "Natureza",
     "fornecedor": "Fornecedor",
     "centro": "Centro de custo",
+    "ano": "Ano",
     "mes": "Mês",
     "dia": "Dia",
 }
@@ -52,6 +54,7 @@ def montar():
         grupos=agrupar(db.session, filtro, por=por) if por else None,
         titulo_do_grupo=TITULOS.get(por, ""),
         chips=chips_do_filtro(request.args),
+        query_base=query_sem(request.args, "pagina"),
     )
 
 
@@ -82,7 +85,7 @@ def baixar(formato: str):
         )
     except pdf.RelatorioGrandeDemais as erro:
         flash(str(erro), "atencao")
-        return redirect(url_for("relatorios.montar", **request.args))
+        return redirect(url_for("relatorios.montar", **query_sem(request.args)))
 
     registrar(
         db.session,

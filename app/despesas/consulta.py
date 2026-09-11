@@ -73,6 +73,8 @@ def _resolver(sessao, modelo, coluna, termos: list[str]) -> list[str]:
 # Nao sao filtro: agrupar muda a apresentacao, e pagina/ordem a navegacao.
 FORA_DO_RECORTE = {"agrupar", "pagina", "ordem", "desc", "campo_data"}
 
+MULTIPLOS = ("centro", "natureza", "fornecedor")
+
 ROTULOS = {
     "centro": "Centro de custo",
     "natureza": "Natureza",
@@ -102,7 +104,19 @@ def chips_do_filtro(args) -> list[Chip]:
     def sem(*chaves: str) -> dict:
         # A pagina sai junto: sair de um filtro na pagina 3 poderia cair fora
         # do resultado novo.
-        restante = {c: v for c, v in args.items() if v and c not in chaves and c != "pagina"}
+        return {
+            chave: valores
+            for chave, valores in todos_os_valores(args).items()
+            if chave not in chaves and chave != "pagina"
+        }
+
+    def sem_o_valor(chave: str, alvo: str) -> dict:
+        restante = sem()
+        sobrou = [valor for valor in restante.get(chave, []) if valor != alvo]
+        if sobrou:
+            restante[chave] = sobrou
+        else:
+            restante.pop(chave, None)
         return restante
 
     inicio, fim = _data(presentes.get("inicio")), _data(presentes.get("fim"))
@@ -116,7 +130,11 @@ def chips_do_filtro(args) -> list[Chip]:
             valor = f"até {_curta(fim)}"
         lista.append(Chip(rotulo, valor, sem("inicio", "fim")))
 
-    for chave in ("centro", "natureza", "fornecedor", "referencia", "documento", "busca"):
+    for chave in MULTIPLOS:
+        for valor in _lista(args, chave):
+            lista.append(Chip(ROTULOS[chave], valor, sem_o_valor(chave, valor)))
+
+    for chave in ("referencia", "documento", "busca"):
         valor = presentes.get(chave)
         if valor:
             lista.append(Chip(ROTULOS[chave], valor, sem(chave)))
@@ -155,9 +173,22 @@ def opcoes(session) -> dict:
     }
 
 
+def todos_os_valores(args) -> dict[str, list[str]]:
+    """A query string como dict de listas; `**args` perderia os repetidos."""
+    return {
+        chave: [valor for valor in args.getlist(chave) if valor]
+        for chave in args.keys()
+        if any(valor for valor in args.getlist(chave))
+    }
+
+
 def query_sem(args, *remover: str) -> dict:
-    """Copia da query string sem certas chaves — para montar links de paginacao."""
-    return {chave: valor for chave, valor in args.items(multi=True) if chave not in remover}
+    """Copia da query string sem certas chaves — para montar links e formularios."""
+    return {
+        chave: valores
+        for chave, valores in todos_os_valores(args).items()
+        if chave not in remover
+    }
 
 
 def _data(texto: str | None) -> date | None:

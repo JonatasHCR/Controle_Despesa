@@ -123,6 +123,7 @@ def _registrar_contexto(app: Flask) -> None:
             # O que a pessoa digitou no filtro, e nao o que ele virou depois de
             # resolvido: quem digitou "MEI" nao quer o nome inteiro de volta.
             "termo": lambda chave: request.args.get(chave, ""),
+            "selecionados": lambda chave: [v for v in request.args.getlist(chave) if v],
         }
 
 

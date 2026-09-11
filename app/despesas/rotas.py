@@ -61,7 +61,10 @@ def painel():
         meses=len(por_mes),
         periodo_dos_meses=_periodo(por_mes),
         fornecedor_divergente=_fornecedor_das_divergencias(filtro),
+        # Sem "divergentes" para o link "ver os divergentes" poder acrescentá-lo;
+        # com ele no do relatório, que precisa do recorte inteiro.
         query_base=query_sem(request.args, "pagina", "divergentes"),
+        query_completa=query_sem(request.args, "pagina"),
     )
 
 
@@ -141,6 +144,80 @@ def editar(identificador: int):
     )
     db.session.commit()
     flash(f"Despesa {despesa.referencia} atualizada.", "")
+    return _de_volta_para_a_lista()
+
+
+@bp.post("/despesas/divergencia-em-lote")
+@requer("operador")
+def divergencia_em_lote():
+    """Marca/desmarca varias de uma vez; a selecao atravessa as paginas."""
+    ignorar = request.form.get("acao") != "comparar"
+    identificadores = {
+        int(valor) for valor in request.form.getlist("ids") if valor.isdigit()
+    }
+    if not identificadores:
+        flash("Nenhuma despesa selecionada.", "erro")
+        return _de_volta_para_a_lista()
+
+    despesas = db.session.scalars(
+        select(Despesa).where(Despesa.id.in_(identificadores))
+    ).all()
+
+    mudaram = [d for d in despesas if d.divergencia_ignorada != ignorar]
+    for despesa in mudaram:
+        despesa.divergencia_ignorada = ignorar
+
+    if mudaram:
+        registrar(
+            db.session,
+            acao="despesa.divergencia",
+            usuario=usuario_atual(),
+            alvo_tipo="despesa",
+            alvo_id=None,
+            payload={
+                "divergencia_ignorada": ignorar,
+                "quantidade": len(mudaram),
+                "referencias": sorted(d.referencia for d in mudaram),
+            },
+        )
+    db.session.commit()
+
+    flash(
+        f"{len(mudaram)} despesa(s) "
+        + ("deixaram de sinalizar divergência." if ignorar else "voltaram a comparar os valores."),
+        "",
+    )
+    return _de_volta_para_a_lista()
+
+
+@bp.post("/despesas/<int:identificador>/divergencia")
+@requer("operador")
+def alternar_divergencia(identificador: int):
+    """Liga/desliga a comparação entre original e baixado nesta despesa."""
+    despesa = db.session.get(Despesa, identificador) or abort(404)
+    despesa.divergencia_ignorada = not despesa.divergencia_ignorada
+
+    registrar(
+        db.session,
+        acao="despesa.divergencia",
+        usuario=usuario_atual(),
+        alvo_tipo="despesa",
+        alvo_id=despesa.id,
+        payload={
+            "referencia": despesa.referencia,
+            "divergencia_ignorada": despesa.divergencia_ignorada,
+        },
+    )
+    db.session.commit()
+    flash(
+        f"Despesa {despesa.referencia}: "
+        + (
+            "divergência deixou de ser sinalizada."
+            if despesa.divergencia_ignorada
+            else "voltou a comparar os valores."
+        ),
+        "",
+    )
     return _de_volta_para_a_lista()
 
 
@@ -252,6 +329,7 @@ def _preencher(despesa: Despesa, form) -> str | None:
     despesa.documento = (form.get("documento") or "").strip()
     despesa.valor_original = valor_original
     despesa.valor_baixado = valor_baixado
+    despesa.divergencia_ignorada = form.get("divergencia_ignorada") in ("1", "true", "on")
     return None
 
 
@@ -264,4 +342,5 @@ def _instantaneo(despesa: Despesa) -> dict:
         "documento": despesa.documento,
         "valor_original": str(despesa.valor_original or Decimal("0")),
         "valor_baixado": str(despesa.valor_baixado or Decimal("0")),
+        "divergencia_ignorada": despesa.divergencia_ignorada,
     }

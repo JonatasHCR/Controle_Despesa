@@ -6,6 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -15,8 +16,10 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    false,
     func,
 )
+from sqlalchemy import and_ as sa_and
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -54,6 +57,12 @@ class Despesa(db.Model):
     valor_original: Mapped[Decimal | None] = mapped_column(DINHEIRO, nullable=True)
     valor_baixado: Mapped[Decimal | None] = mapped_column(DINHEIRO, nullable=True)
 
+    # Marcada quando a diferenca e esperada (baixa parcial que ainda vai crescer):
+    # para de sinalizar sem mexer nos valores.
+    divergencia_ignorada: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=false(), default=False
+    )
+
     # NULL = lancada a mao, e nao vinda de planilha.
     importacao_id: Mapped[int | None] = mapped_column(
         ForeignKey("tb_importacoes.id", ondelete="SET NULL"), nullable=True, index=True
@@ -85,13 +94,27 @@ class Despesa(db.Model):
 
     @hybrid_property
     def divergente(self) -> bool:
-        return self.valor_original != self.valor_baixado
+        return not self.divergencia_ignorada and self.valor_original != self.valor_baixado
 
     @divergente.expression
     @classmethod
     def divergente(cls):
         # IS DISTINCT FROM, e nao `<>`: com NULL de um lado o `<>` devolve NULL
         # e a linha sumiria do filtro em silencio.
+        return sa_and(
+            cls.divergencia_ignorada.is_(False),
+            cls.valor_original.is_distinct_from(cls.valor_baixado),
+        )
+
+    @hybrid_property
+    def diverge_nos_valores(self) -> bool:
+        """A diferenca crua, ignorando a marcacao. E o que a tela de edicao
+        mostra para explicar por que existe a opcao de parar de sinalizar."""
+        return self.valor_original != self.valor_baixado
+
+    @diverge_nos_valores.expression
+    @classmethod
+    def diverge_nos_valores(cls):
         return cls.valor_original.is_distinct_from(cls.valor_baixado)
 
     @hybrid_property

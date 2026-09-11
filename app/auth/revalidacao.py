@@ -96,7 +96,10 @@ def instalar(app) -> None:
             return None
 
         session.clear()
-        destino = url_for("auth.login", proximo=request.full_path)
+        # `proximo` so para GET: o callback volta sempre com GET, e devolver a
+        # pessoa a uma rota POST-only daria 405 em vez da tela dela.
+        proximo = request.full_path if request.method == "GET" else None
+        destino = url_for("auth.login", proximo=proximo)
         if request.headers.get("HX-Request"):
             resposta = redirect(destino)
             resposta.headers["HX-Redirect"] = destino
