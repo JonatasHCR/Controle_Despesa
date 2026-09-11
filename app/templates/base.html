@@ -35,6 +35,9 @@
   </nav>
 
   <div class="direita">
+    {% if portal %}
+      <a class="botao" href="{{ portal }}">← Portal</a>
+    {% endif %}
     {% if outros_sistemas %}
       <select data-ir-para aria-label="Ir para outro sistema">
         <option value="">Sistemas…</option>
@@ -44,7 +47,7 @@
       </select>
     {% endif %}
     <button type="button" id="alternar-tema" title="Alternar tema">◐</button>
-    <span class="pessoa">{{ usuario.nome }}</span>
+    <a class="pessoa" href="{{ conta }}" title="Minha conta">{{ usuario.nome }}</a>
     <a class="botao" href="{{ url_for('auth.logout') }}">Sair</a>
   </div>
 </header>

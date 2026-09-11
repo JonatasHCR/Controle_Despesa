@@ -106,13 +106,15 @@ def _registrar_contexto(app: Flask) -> None:
     from flask_wtf.csrf import generate_csrf
 
     from app.auth.guardas import usuario_atual
-    from app.sistemas import outros_sistemas
+    from app.sistemas import conta_url, outros_sistemas, portal_url
 
     @app.context_processor
     def injetar():
         usuario = usuario_atual() if request.endpoint else None
         return {
             "usuario": usuario,
+            "portal": portal_url() if usuario else None,
+            "conta": conta_url() if usuario else None,
             "outros_sistemas": outros_sistemas(session.get("grupos", [])) if usuario else [],
             "listas": _listas_de_dominio() if usuario else {},
             "form_csrf": lambda: Markup(

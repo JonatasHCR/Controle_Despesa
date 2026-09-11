@@ -61,10 +61,13 @@ def logout():
     id_token = session.get("id_token")
     session.clear()
 
-    # Logout RP-initiated: encerra a sessao no Keycloak, deslogando de todos os
-    # sistemas. Apagar so o cookie daqui deixaria o proximo acesso entrar direto.
+    # Sem client_id nem id_token_hint o Keycloak nao sabe contra qual client
+    # validar o destino, e devolve 400.
     fim = current_app.config["OIDC_ISSUER"] + "/protocol/openid-connect/logout"
-    parametros = {"post_logout_redirect_uri": portal_url()}
+    parametros = {
+        "client_id": current_app.config["OIDC_CLIENT_ID"],
+        "post_logout_redirect_uri": portal_url(),
+    }
     if id_token:
         parametros["id_token_hint"] = id_token
     return redirect(f"{fim}?{urlencode(parametros)}")

@@ -6,6 +6,8 @@ poucas linhas, e um pacote compartilhado exigiria publicar e versionar.
 
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from flask import current_app
 
 GRUPO_DESTE_SISTEMA = "/apps/controle-despesa"
@@ -17,6 +19,19 @@ def _host() -> str:
 
 def portal_url() -> str:
     return f"{_host()}:{current_app.config['PORTAL_PORT']}"
+
+
+def conta_url() -> str:
+    """Account Console do Keycloak, onde se troca senha e dados pessoais."""
+    # referrer/referrer_uri: sem eles o console nao oferece volta. O
+    # referrer_uri precisa estar nos redirectUris do client, ou vem ignorado.
+    parametros = urlencode(
+        {
+            "referrer": current_app.config["OIDC_CLIENT_ID"],
+            "referrer_uri": f"{url_publica()}/",
+        }
+    )
+    return f"{current_app.config['OIDC_ISSUER']}/account?{parametros}"
 
 
 def url_publica(caminho: str = "") -> str:
