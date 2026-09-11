@@ -117,8 +117,15 @@ def eh_linha_de_total(celulas: list, mapa: dict | None = None) -> bool:
     if len(rotulos) >= limite:
         return False
 
-    ultimo = rotulos[-1]
-    return isinstance(ultimo, str) and ultimo.rstrip().endswith(" Total")
+    return _rotulo_de_total(rotulos[-1])
+
+
+def _rotulo_de_total(valor) -> bool:
+    """O Excel escreve "X Total" nos subtotais e "Total Geral" no total do fim."""
+    if not isinstance(valor, str):
+        return False
+    texto = valor.strip().upper()
+    return texto.endswith(" TOTAL") or texto == "TOTAL" or texto.startswith("TOTAL ")
 
 
 def _celula_vazia(valor) -> bool:

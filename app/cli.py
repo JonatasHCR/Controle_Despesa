@@ -15,6 +15,7 @@ from flask import Blueprint
 from sqlalchemy import func, select
 
 from app.extensions import db
+from app.formato import moeda, moeda_com_sinal
 from app.models import PERFIS, Despesa, Usuario
 
 bp = Blueprint("cli", __name__, cli_group=None)
@@ -77,7 +78,11 @@ def importar(caminho: str, email: str | None, previa: bool) -> None:
     click.echo(f"{resultado.ignoradas} linhas de subtotal ignoradas")
     click.echo(f"{len(resultado.erros)} linhas com erro")
     click.echo(f"{resultado.divergentes} divergencias")
-    click.echo(f"total baixado: {resultado.total_baixado}")
+    click.echo(f"total original: {moeda(resultado.total_original):>20}")
+    click.echo(f"total baixado : {moeda(resultado.total_baixado):>20}")
+    diferenca = resultado.total_baixado - resultado.total_original
+    if diferenca:
+        click.echo(f"diferenca     : {moeda_com_sinal(diferenca):>20}")
     click.echo(f"a criar: {resultado.a_criar} | a atualizar: {resultado.a_atualizar}")
 
     for erro in resultado.erros[:10]:
