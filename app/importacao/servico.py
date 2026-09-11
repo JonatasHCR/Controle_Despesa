@@ -25,6 +25,7 @@ class Previa:
     sha256: str
     linhas: list[LinhaPlanilha] = field(default_factory=list)
     erros: list[ErroLinha] = field(default_factory=list)
+    avisos: list[ErroLinha] = field(default_factory=list)
     ignoradas: int = 0
     novos_fornecedores: list[str] = field(default_factory=list)
     novas_naturezas: list[str] = field(default_factory=list)
@@ -53,6 +54,7 @@ def analisar(session, origem, *, arquivo_nome: str) -> Previa:
         sha256=sha,
         linhas=linhas,
         erros=resultado.erros,
+        avisos=resultado.avisos,
         ignoradas=resultado.ignoradas,
         divergentes=sum(1 for linha in linhas if linha.divergente),
         total_original=sum((linha.valor_original for linha in linhas), Decimal("0.00")),
@@ -119,6 +121,7 @@ def gravar(session, previa: Previa, *, usuario=None, progresso=None) -> Importac
             "atualizados": atualizados,
             "ignoradas": previa.ignoradas,
             "erros": len(previa.erros),
+            "avisos": len(previa.avisos),
             "divergentes": previa.divergentes,
             "total_baixado": str(previa.total_baixado),
         },

@@ -77,6 +77,8 @@ def importar(caminho: str, email: str | None, previa: bool) -> None:
     click.echo(f"{len(resultado.linhas)} lancamentos")
     click.echo(f"{resultado.ignoradas} linhas de subtotal ignoradas")
     click.echo(f"{len(resultado.erros)} linhas com erro")
+    if resultado.avisos:
+        click.echo(f"{len(resultado.avisos)} linhas com aviso (entram, mas confira)")
     click.echo(f"{resultado.divergentes} divergencias")
     click.echo(f"total original: {moeda(resultado.total_original):>20}")
     click.echo(f"total baixado : {moeda(resultado.total_baixado):>20}")
@@ -87,6 +89,8 @@ def importar(caminho: str, email: str | None, previa: bool) -> None:
 
     for erro in resultado.erros[:10]:
         click.echo(f"  linha {erro.linha}: {erro.campo} — {erro.mensagem}")
+    for aviso in resultado.avisos[:10]:
+        click.echo(f"  aviso {aviso.linha}: {aviso.campo} — {aviso.mensagem}")
 
     if previa:
         click.echo("\n(previa: nada foi gravado)")

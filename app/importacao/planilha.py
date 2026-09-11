@@ -75,6 +75,9 @@ class ErroLinha:
 class Resultado:
     linhas: list[LinhaPlanilha] = field(default_factory=list)
     erros: list[ErroLinha] = field(default_factory=list)
+    # Problema que nao derruba a linha: a data de emissao e opcional, e perder
+    # o lancamento inteiro por causa dela custaria mais do que corrige.
+    avisos: list[ErroLinha] = field(default_factory=list)
     ignoradas: int = 0
 
     @property
@@ -89,15 +92,33 @@ def normalizar_texto(valor: object) -> str:
     return _ESPACOS.sub(" ", str(valor)).strip()
 
 
+# Faixa aceitavel. Um ano a frente cobre documento pos-datado; alem disso e
+# quase certo que a celula nao era a data que parece.
+ANO_MINIMO = 1990
+DIAS_A_FRENTE = 366
+
+
 def serial_para_data(serial: float | int) -> date:
     dias = int(serial)
     if dias <= 0:
         raise ValueError(f"serial de data inválido: {serial!r}")
     if dias == 60:
         raise ValueError("serial 60 é 29/02/1900, data que nunca existiu")
-    if dias < 60:
-        return _EPOCA_ANTES_DO_BUG + timedelta(days=dias)
-    return _EPOCA_DEPOIS_DO_BUG + timedelta(days=dias)
+    try:
+        base = _EPOCA_ANTES_DO_BUG if dias < 60 else _EPOCA_DEPOIS_DO_BUG
+        return base + timedelta(days=dias)
+    except OverflowError as erro:
+        raise ValueError(f"serial de data fora de faixa: {serial!r}") from erro
+
+
+def _conferir_faixa(valor: date, origem) -> date:
+    teto = date.today() + timedelta(days=DIAS_A_FRENTE)
+    if valor.year < ANO_MINIMO or valor > teto:
+        raise ValueError(
+            f"data {valor.strftime('%d/%m/%Y')} fora da faixa esperada "
+            f"(de {ANO_MINIMO} até {teto.strftime('%d/%m/%Y')})"
+        )
+    return valor
 
 
 def eh_linha_de_total(celulas: list, mapa: dict | None = None) -> bool:
@@ -252,9 +273,12 @@ def _ler_linha(numero: int, celulas: list, mapa: dict[str, int], resultado: Resu
     def falhar(campo: str, mensagem: str) -> None:
         erros.append(ErroLinha(linha=numero, campo=campo, mensagem=mensagem))
 
+    def avisar(campo: str, mensagem: str) -> None:
+        resultado.avisos.append(ErroLinha(linha=numero, campo=campo, mensagem=mensagem))
+
     referencia = _inteiro(bruto("REFERENCIA"), "REFERENCIA", falhar)
     data_baixa = _data_de_baixa(bruto("ANO_BAIXA"), bruto("MES_BAIXA"), bruto("DIA_BAIXA"), falhar)
-    data_emissao = _data_qualquer(bruto("DATAEMISSAO"), "DATAEMISSAO", falhar)
+    data_emissao = _data_qualquer(bruto("DATAEMISSAO"), "DATAEMISSAO", avisar)
     fornecedor = normalizar_texto(bruto("FORNECEDOR"))
     if not fornecedor:
         falhar("FORNECEDOR", "vazio")
@@ -359,26 +383,33 @@ def _data_qualquer(valor, campo: str, falhar) -> date | None:
     """DATAEMISSAO chega como serial, datetime ou texto. Ausente nao e erro."""
     if valor is None or str(valor).strip() == "":
         return None
-    if isinstance(valor, datetime):
-        return valor.date()
-    if isinstance(valor, date):
-        return valor
+    # Data que o Excel ja entregou pronta tambem passa pela faixa: se a planilha
+    # traz 2042, o erro e dela e precisa aparecer, nao entrar calado.
+    if isinstance(valor, datetime | date):
+        crua = valor.date() if isinstance(valor, datetime) else valor
+        try:
+            return _conferir_faixa(crua, crua.isoformat())
+        except ValueError as erro:
+            falhar(campo, str(erro))
+            return None
     if isinstance(valor, int | float):
         try:
-            return serial_para_data(valor)
-        except ValueError as erro:
+            return _conferir_faixa(serial_para_data(valor), valor)
+        except (ValueError, OverflowError) as erro:
             falhar(campo, str(erro))
             return None
 
     texto = str(valor).strip()
-    try:
-        return serial_para_data(float(texto))
-    except ValueError:
-        pass
-    for formato in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S"):
+
+    # Formato de data ANTES de serial: "51866" tambem e um float valido, e
+    # viraria 2041 em silencio.
+    for formato in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d/%m/%y"):
         try:
             return datetime.strptime(texto, formato).date()
         except ValueError:
             continue
-    falhar(campo, f"não consegui interpretar como data: {valor!r}")
-    return None
+    try:
+        return _conferir_faixa(serial_para_data(float(texto)), texto)
+    except (ValueError, OverflowError) as erro:
+        falhar(campo, str(erro))
+        return None

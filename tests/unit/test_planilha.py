@@ -596,3 +596,57 @@ def test_subtotal_por_documento_nao_e_detectavel():
 def test_linha_normal_nao_e_subtotal():
     normal = [2010, 12, 30, "31/12/2010", 999, "FORN", "4561", "NAT", "h", "D1", -10, -10]
     assert not eh_linha_de_total(normal, MAPA)
+
+
+# --- data fora de faixa -----------------------------------------------------
+
+
+def test_texto_numerico_nao_vira_data():
+    """'51866' é float válido: virava 31/12/2041 em silêncio."""
+    erros = []
+    from app.importacao.planilha import _data_qualquer
+
+    assert _data_qualquer("51866", "DATAEMISSAO", lambda c, m: erros.append(m)) is None
+    assert "fora da faixa" in erros[0]
+
+
+def test_data_no_futuro_distante_e_recusada():
+    from datetime import datetime
+
+    from app.importacao.planilha import _data_qualquer
+
+    erros = []
+    assert _data_qualquer(
+        datetime(2042, 8, 21), "DATAEMISSAO", lambda c, m: erros.append(m)
+    ) is None
+    assert "21/08/2042" in erros[0]
+
+
+def test_formato_de_data_vem_antes_de_serial():
+    from app.importacao.planilha import _data_qualquer
+
+    for texto in ("07/10/2010", "2010-10-07", "07/10/2010 00:00:00"):
+        assert _data_qualquer(texto, "DATAEMISSAO", lambda c, m: None) == date(2010, 10, 7)
+
+
+def test_emissao_ruim_nao_derruba_o_lancamento():
+    """Emissão é opcional: perder a despesa inteira por causa dela custa mais."""
+    from datetime import datetime
+
+    linha = list(BASE)
+    linha[3] = datetime(2042, 8, 21)
+    resultado = ler(planilha_das([linha]))
+
+    assert len(resultado.linhas) == 1
+    assert resultado.linhas[0].data_emissao is None
+    assert resultado.erros == []
+    assert len(resultado.avisos) == 1
+
+
+def test_serial_grande_nao_estoura():
+    """'07102010' sem barras dava OverflowError e derrubava a importação."""
+    from app.importacao.planilha import _data_qualquer
+
+    erros = []
+    assert _data_qualquer("07102010", "DATAEMISSAO", lambda c, m: erros.append(m)) is None
+    assert erros
