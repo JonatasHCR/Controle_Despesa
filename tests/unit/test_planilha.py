@@ -351,12 +351,6 @@ def test_valor_aceita_os_dois_formatos(tmp_path, entrada, esperado):
     assert resultado.linhas[0].valor_baixado == esperado
 
 
-# --- referencia repetida dentro do arquivo ----------------------------------
-#
-# REFERENCIA e unica no banco. Duas linhas com a mesma quebravam a gravacao
-# inteira no commit, e o erro chegava ao usuario como 500.
-
-
 def planilha_com(referencias: list[int]):
     from io import BytesIO
 
@@ -408,10 +402,6 @@ def test_arquivo_sem_repeticao_passa_inteiro():
 
 
 # --- ponto e vírgula nos valores -------------------------------------------
-#
-# Célula numérica já vem desambiguada pelo Excel; texto digitado à mão não.
-# Tratar os dois igual quebrava um dos lados.
-
 
 def normalizado(valor):
     from decimal import ROUND_HALF_UP, Decimal
@@ -475,13 +465,12 @@ def test_espaco_inquebravel_nao_derruba():
 
 
 # --- a chave natural --------------------------------------------------------
-#
-# A referência sozinha repete: o ERP a reaproveita. O que não pode repetir é
-# ela junto de fornecedor, natureza, centro de custo, documento e histórico.
-
 
 BASE = [2026, 3, 9, 46059, 555000, "FORN A", "4561", "NAT A", "hist X", "DOC1", -10.0, -10.0]
-POSICAO = {"fornecedor": 5, "centro": 6, "natureza": 7, "historico": 8, "documento": 9}
+POSICAO = {
+    "ano": 0, "mes": 1, "dia": 2,
+    "fornecedor": 5, "centro": 6, "natureza": 7, "historico": 8, "documento": 9,
+}
 
 
 def com(**mudanca):
@@ -514,6 +503,9 @@ def planilha_das(linhas):
 @pytest.mark.parametrize(
     "campo,valor",
     [
+        ("dia", 10),
+        ("mes", 4),
+        ("ano", 2025),
         ("fornecedor", "FORN B"),
         ("natureza", "NAT B"),
         ("centro", "9999"),
@@ -548,10 +540,6 @@ def test_fornecedor_so_muda_de_caixa_nao_e_lancamento_novo():
 
 
 # --- subtotal em qualquer nível ---------------------------------------------
-#
-# A regra antiga só olhava as 4 primeiras colunas e deixava passar o subtotal
-# por FORNECEDOR. Numa amostra real de 2010 isso inflava o total em 32%.
-
 
 MAPA = {
     "ANO_BAIXA": 0, "MES_BAIXA": 1, "DIA_BAIXA": 2, "DATAEMISSAO": 3,

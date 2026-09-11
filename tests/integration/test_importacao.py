@@ -212,13 +212,6 @@ def test_arquivo_invalido_nao_deixa_rastro(db):
     assert db.session.scalar(select(func.count()).select_from(Importacao)) == 0
 
 
-# --- planilha grande --------------------------------------------------------
-#
-# O IN gasta um parâmetro por referência, e o PostgreSQL para em 65535. Uma
-# planilha grande estourava isso, sujava a sessão, e o erro saía como 500
-# vários passos adiante (PendingRollbackError).
-
-
 def planilha_de(quantidade: int, base: int):
     from io import BytesIO
 
@@ -291,3 +284,30 @@ def test_progresso_e_chamado_por_lote(db):
     assert chamadas[-1] == (quantidade, quantidade)
     assert all(total == quantidade for _, total in chamadas)
     assert LOTE_DE_PARAMETROS  # sanidade do import
+
+
+def test_planilha_grande_e_recusada_na_tela_com_instrucao(entrar, operador, db):
+    """Acima do teto a página cairia sem gravar nada; melhor recusar cedo."""
+    from app.importacao.rotas import TETO_DE_LINHAS_NA_TELA
+
+    resposta = entrar(operador).post(
+        "/importacao/previa",
+        data={"planilha": (planilha_de(TETO_DE_LINHAS_NA_TELA + 1, 80_000_000), "grande.xlsx")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    corpo = resposta.get_data(as_text=True)
+    assert "acima do limite" in corpo
+    assert "flask importar" in corpo
+
+
+def test_planilha_dentro_do_teto_mostra_a_previa(entrar, operador, db):
+    resposta = entrar(operador).post(
+        "/importacao/previa",
+        data={"planilha": (planilha_de(50, 81_000_000), "pequena.xlsx")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    corpo = resposta.get_data(as_text=True)
+    assert "acima do limite" not in corpo
+    assert "Confirmar importação" in corpo

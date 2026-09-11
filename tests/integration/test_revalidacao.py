@@ -291,3 +291,27 @@ def test_get_interrompido_ainda_volta_para_a_pagina(logado, keycloak_falso):
 
     assert resposta.status_code == 302
     assert "proximo" in resposta.headers["Location"]
+
+
+def test_renovar_busca_as_claims_por_conta_propria(monkeypatch):
+    """Sem buscar as claims, `revalidar` dava sempre por falha. O mock dos
+    outros testes devolve `userinfo` pronto e esconde isso."""
+    from app.extensions import oauth
+
+    chamadas = []
+
+    class ClienteFalso:
+        def fetch_access_token(self, **kwargs):
+            chamadas.append("fetch")
+            return {"access_token": "novo", "refresh_token": "r2", "expires_in": 300}
+
+        def userinfo(self, token=None):
+            chamadas.append("userinfo")
+            return {"sub": "s", "email": "a@b.com", "groups": [GRUPO]}
+
+    monkeypatch.setattr(oauth, "keycloak", ClienteFalso(), raising=False)
+
+    token = revalidacao._renovar_no_keycloak("refresh-qualquer")
+
+    assert chamadas == ["fetch", "userinfo"], "não buscou as claims"
+    assert token["userinfo"]["email"] == "a@b.com"

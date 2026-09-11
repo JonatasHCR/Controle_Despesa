@@ -226,6 +226,7 @@ def test_lancamento_identico_e_recusado(entrar, operador, db, carregado):
         "/despesas/nova",
         data=formulario(
             referencia="136914",
+            data_baixa=existente.data_baixa.isoformat(),
             fornecedor=existente.fornecedor.nome,
             natureza=existente.natureza.nome,
             centro_custo=existente.centro_custo.codigo,
@@ -235,6 +236,27 @@ def test_lancamento_identico_e_recusado(entrar, operador, db, carregado):
     )
     assert resposta.status_code == 400
     assert "Já existe" in resposta.get_data(as_text=True)
+
+
+def test_mesmo_lancamento_em_outra_data_de_baixa_passa(entrar, operador, db, carregado):
+    existente = db.session.scalars(
+        select(Despesa).where(Despesa.referencia == 136914)
+    ).one()
+    resposta = entrar(operador).post(
+        "/despesas/nova",
+        data=formulario(
+            referencia="136914",
+            data_baixa="2026-12-25",
+            fornecedor=existente.fornecedor.nome,
+            natureza=existente.natureza.nome,
+            centro_custo=existente.centro_custo.codigo,
+            documento=existente.documento,
+            historico=existente.historico,
+        ),
+        follow_redirects=True,
+    )
+    assert resposta.status_code == 200
+    assert len(db.session.scalars(select(Despesa).where(Despesa.referencia == 136914)).all()) == 2
 
 
 def test_campo_obrigatorio_faltando_volta_com_mensagem(entrar, operador):
