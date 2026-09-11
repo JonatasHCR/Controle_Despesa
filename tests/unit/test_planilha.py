@@ -545,3 +545,45 @@ def test_fornecedor_so_muda_de_caixa_nao_e_lancamento_novo():
     resultado = ler(planilha_das([BASE, com(fornecedor="forn a")]))
     assert len(resultado.erros) == 1
     assert resultado.linhas == []
+
+
+# --- subtotal em qualquer nível ---------------------------------------------
+#
+# A regra antiga só olhava as 4 primeiras colunas e deixava passar o subtotal
+# por FORNECEDOR. Numa amostra real de 2010 isso inflava o total em 32%.
+
+
+MAPA = {
+    "ANO_BAIXA": 0, "MES_BAIXA": 1, "DIA_BAIXA": 2, "DATAEMISSAO": 3,
+    "REFERENCIA": 4, "FORNECEDOR": 5, "CR_REDUZIDO": 6, "NATUREZA": 7,
+    "HISTORICO": 8, "DOCUMENTO": 9, "VALOR ORIGINAL": 10, "VALOR BAIXADO": 11,
+}
+
+
+@pytest.mark.parametrize(
+    "celulas,motivo",
+    [
+        (["2010 Total", None, None, None, None, None, None, None, None, None, -1, -1], "ano"),
+        ([2010, "12 Total", None, None, None, None, None, None, None, None, -1, -1], "mês"),
+        ([2010, 12, "30 Total", None, None, None, None, None, None, None, -1, -1], "dia"),
+        ([2010, 12, 30, "31/12/2010 Total", None, None, None, None, None, None, -1, -1], "data"),
+        ([2010, 12, 30, "d", 2685, "FULANO Total", None, None, None, None, -1, -1], "fornecedor"),
+    ],
+)
+def test_subtotal_e_descartado_em_qualquer_nivel(celulas, motivo):
+    assert eh_linha_de_total(celulas, MAPA), f"não pegou o subtotal por {motivo}"
+
+
+def test_fornecedor_chamado_total_nao_e_subtotal():
+    """"TOTAL DISTRIBUIDORA" é fornecedor legítimo; o que distingue é o resto
+    da linha estar preenchido."""
+    lancamento = [
+        2010, 12, 30, "31/12/2010", 999, "DISTRIBUIDORA Total", "4561",
+        "COMBUSTIVEL", "abastecimento", "DOC1", -10, -10,
+    ]
+    assert not eh_linha_de_total(lancamento, MAPA)
+
+
+def test_linha_normal_nao_e_subtotal():
+    normal = [2010, 12, 30, "31/12/2010", 999, "FORN", "4561", "NAT", "h", "D1", -10, -10]
+    assert not eh_linha_de_total(normal, MAPA)

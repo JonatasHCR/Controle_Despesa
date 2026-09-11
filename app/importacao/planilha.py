@@ -104,15 +104,36 @@ def serial_para_data(serial: float | int) -> date:
     return _EPOCA_DEPOIS_DO_BUG + timedelta(days=dias)
 
 
-def eh_linha_de_total(celulas: list) -> bool:
-    """O rotulo muda de coluna conforme o nivel, mas sempre termina em ' Total'."""
-    for indice in COLUNAS_DE_AGRUPAMENTO:
-        if indice >= len(celulas):
-            continue
-        valor = celulas[indice]
-        if isinstance(valor, str) and valor.rstrip().endswith(" Total"):
-            return True
-    return False
+def eh_linha_de_total(celulas: list, mapa: dict | None = None) -> bool:
+    """Subtotal do Excel: o rotulo termina em ' Total' e e a ULTIMA coisa
+    preenchida antes das colunas de valor.
+
+    Olhar so o sufixo derrubaria um fornecedor chamado "... Total"; exigir que
+    o resto da linha esteja vazio distingue, porque lancamento de verdade
+    sempre traz natureza e documento depois do fornecedor.
+    """
+    limite = _inicio_dos_valores(celulas, mapa)
+    rotulos = celulas[:limite]
+
+    while rotulos and _celula_vazia(rotulos[-1]):
+        rotulos.pop()
+
+    if not rotulos:
+        return False
+    ultimo = rotulos[-1]
+    return isinstance(ultimo, str) and ultimo.rstrip().endswith(" Total")
+
+
+def _celula_vazia(valor) -> bool:
+    return valor is None or (isinstance(valor, str) and not valor.strip())
+
+
+def _inicio_dos_valores(celulas: list, mapa: dict | None) -> int:
+    if mapa:
+        posicoes = [mapa[nome] for nome in ("VALOR ORIGINAL", "VALOR BAIXADO") if nome in mapa]
+        if posicoes:
+            return min(posicoes)
+    return len(celulas)
 
 
 def ler(origem) -> Resultado:
@@ -130,7 +151,7 @@ def ler(origem) -> Resultado:
         numero = indice_cabecalho + deslocamento + 2
         celulas = list(celulas)
 
-        if eh_linha_de_total(celulas):
+        if eh_linha_de_total(celulas, mapa):
             resultado.ignoradas += 1
             continue
         if _vazia(celulas):
