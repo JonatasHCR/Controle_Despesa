@@ -345,3 +345,97 @@ def test_folhas_de_estilo_sao_parseadas_uma_vez(app, carregado):
         primeira = _folhas_de_estilo()
         segunda = _folhas_de_estilo()
     assert primeira is segunda
+
+
+# --- cabeçalho e larguras do PDF --------------------------------------------
+
+MM_CSS = 96 / 25.4
+
+
+def documento_do_pdf(app, carregado, quantas=60):
+    from sqlalchemy import select
+
+    from app.despesas.filtros import aplicar, totais
+    from app.models import Despesa
+    from app.relatorios.pdf import montar
+
+    filtro = Filtro()
+    with app.test_request_context():
+        despesas = carregado.session.scalars(aplicar(select(Despesa), filtro)).all()
+        return montar(
+            despesas[:quantas],
+            totais(carregado.session, filtro),
+            descricao_do_filtro="todos os lançamentos",
+        )
+
+
+def textos(pagina) -> list[str]:
+    achados = []
+
+    def andar(caixa):
+        if getattr(caixa, "text", None):
+            achados.append(caixa.text)
+        for filho in getattr(caixa, "children", []) or []:
+            andar(filho)
+
+    andar(pagina._page_box)
+    return achados
+
+
+def test_pdf_abre_com_a_marca_da_ufc(app, carregado):
+    doc = documento_do_pdf(app, carregado, quantas=5)
+    assert textos(doc.pages[0])[0] == "UFC Engenharia"
+
+
+def test_pdf_e_a4_de_verdade(app, carregado):
+    """O teste de orientação só via altura > largura: uma folha de 280mm passava."""
+    pagina = documento_do_pdf(app, carregado, quantas=5).pages[0]
+    assert round(pagina.width / MM_CSS) == 210
+    assert round(pagina.height / MM_CSS) == 297
+
+
+def test_nada_passa_da_margem_direita(app, carregado):
+    doc = documento_do_pdf(app, carregado)
+    pagina = doc.pages[0]
+    limite = pagina.width / MM_CSS - 12
+
+    direita = [0.0]
+
+    def andar(caixa):
+        try:
+            direita[0] = max(direita[0], caixa.border_box_x() + caixa.border_width())
+        except (AttributeError, TypeError):
+            pass
+        for filho in getattr(caixa, "children", []) or []:
+            andar(filho)
+
+    andar(pagina._page_box)
+    assert direita[0] / MM_CSS <= limite + 0.2
+
+
+def test_valor_nao_quebra_no_meio_do_numero(app, carregado):
+    """A coluna estreita partia "R$ 441.9" / "47,21" — parecia valor cortado."""
+    doc = documento_do_pdf(app, carregado)
+    quebrados = []
+
+    def andar(caixa):
+        linhas = [
+            filho
+            for filho in (getattr(caixa, "children", []) or [])
+            if type(filho).__name__ == "LineBox"
+        ]
+        if type(caixa).__name__ == "BlockBox" and len(linhas) > 1:
+            texto = "".join(
+                getattr(pedaco, "text", "") or ""
+                for linha in linhas
+                for pedaco in (getattr(linha, "children", []) or [])
+            )
+            if texto.lstrip("⚠ ").startswith("R$"):
+                quebrados.append(texto)
+        for filho in getattr(caixa, "children", []) or []:
+            andar(filho)
+
+    for pagina in doc.pages:
+        andar(pagina._page_box)
+
+    assert quebrados == []

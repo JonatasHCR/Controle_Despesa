@@ -101,18 +101,18 @@ def test_pagina_e_ordem_tambem_nao_viram_chip():
 def test_remover_um_chip_preserva_os_outros():
     lista = chips(centro="4561", natureza="COMBUSTIVEL", busca="boleto")
     natureza = next(chip for chip in lista if chip.rotulo == "Natureza")
-    assert natureza.sem == {"centro": "4561", "busca": "boleto"}
+    assert natureza.sem == {"centro": ["4561"], "busca": ["boleto"]}
 
 
 def test_remover_o_periodo_tira_as_duas_pontas():
     lista = chips(inicio="2026-03-01", fim="2026-08-31", centro="4561")
-    assert lista[0].sem == {"centro": "4561"}
+    assert lista[0].sem == {"centro": ["4561"]}
 
 
 def test_remover_a_faixa_de_valor_tira_as_duas_pontas():
     lista = chips(valor_minimo="1000", valor_maximo="5000", centro="4561")
     valor = next(chip for chip in lista if chip.rotulo == "Valor")
-    assert valor.sem == {"centro": "4561"}
+    assert valor.sem == {"centro": ["4561"]}
 
 
 def test_remover_um_chip_descarta_a_pagina():
@@ -124,7 +124,7 @@ def test_remover_um_chip_descarta_a_pagina():
 
 def test_remover_um_chip_preserva_o_agrupamento():
     lista = chips(centro="4561", agrupar="natureza")
-    assert lista[0].sem == {"agrupar": "natureza"}
+    assert lista[0].sem == {"agrupar": ["natureza"]}
 
 
 # --- na tela ----------------------------------------------------------------

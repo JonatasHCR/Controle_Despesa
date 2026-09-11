@@ -349,3 +349,59 @@ def test_valor_aceita_os_dois_formatos(tmp_path, entrada, esperado):
     resultado = ler(caminho)
     assert resultado.erros == []
     assert resultado.linhas[0].valor_baixado == esperado
+
+
+# --- referencia repetida dentro do arquivo ----------------------------------
+#
+# REFERENCIA e unica no banco. Duas linhas com a mesma quebravam a gravacao
+# inteira no commit, e o erro chegava ao usuario como 500.
+
+
+def planilha_com(referencias: list[int]):
+    from io import BytesIO
+
+    from openpyxl import Workbook
+
+    livro = Workbook()
+    aba = livro.active
+    aba.append([])
+    aba.append(
+        [
+            "ANO_BAIXA", "MES_BAIXA", "DIA_BAIXA", "DATAEMISSAO", "REFERENCIA",
+            "FORNECEDOR", "CR_REDUZIDO", "NATUREZA", "HISTORICO", "DOCUMENTO",
+            "VALOR ORIGINAL", "VALOR BAIXADO",
+        ]
+    )
+    for referencia in referencias:
+        aba.append(
+            [2026, 3, 9, 46059, referencia, "FORN X", "4561", "NAT Y", "h", "D1",
+             -10.00, -10.00]
+        )
+    buffer = BytesIO()
+    livro.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def test_referencia_repetida_vira_erro():
+    resultado = ler(planilha_com([501, 502, 501]))
+    assert [erro.campo for erro in resultado.erros] == ["REFERENCIA"]
+    assert "501" in resultado.erros[0].mensagem
+
+
+def test_o_erro_aponta_as_duas_linhas():
+    resultado = ler(planilha_com([501, 502, 501]))
+    assert resultado.erros[0].linha == 5
+    assert "linha 3" in resultado.erros[0].mensagem
+
+
+def test_as_duas_copias_sao_descartadas():
+    """Nem a primeira entra: nao da para adivinhar qual das duas vale."""
+    resultado = ler(planilha_com([501, 502, 501]))
+    assert [linha.referencia for linha in resultado.linhas] == [502]
+
+
+def test_arquivo_sem_repeticao_passa_inteiro():
+    resultado = ler(planilha_com([501, 502, 503]))
+    assert [linha.referencia for linha in resultado.linhas] == [501, 502, 503]
+    assert resultado.erros == []

@@ -261,3 +261,33 @@ def test_perder_o_grupo_de_outro_sistema_tira_o_link(logado, keycloak_falso, car
 
     corpo = cliente.get("/").get_data(as_text=True)
     assert "Receita" not in sistemas_no_menu(corpo)
+
+
+# --- a volta do login nao pode cair numa rota POST-only ---------------------
+#
+# O callback do OIDC sempre volta com GET. Mandar `proximo` de um POST
+# interrompido devolvia a pessoa a /importacao/previa como GET: 405.
+
+
+def test_post_interrompido_nao_volta_para_a_rota_post(logado, keycloak_falso, operador, client):
+    with client.session_transaction() as sessao:
+        sessao["usuario_id"] = operador.id
+        sessao["grupos"] = [GRUPO]
+        sessao["refresh_token"] = "refresh-inicial"
+        sessao["expira_em"] = time.time() + 10
+    keycloak_falso["falhar"] = True
+
+    resposta = client.post("/importacao/previa", data={})
+
+    assert resposta.status_code == 302
+    assert "proximo" not in resposta.headers["Location"]
+
+
+def test_get_interrompido_ainda_volta_para_a_pagina(logado, keycloak_falso):
+    cliente = logado(expira_em_segundos=10)
+    keycloak_falso["falhar"] = True
+
+    resposta = cliente.get("/despesas?natureza=COMBUSTIVEL")
+
+    assert resposta.status_code == 302
+    assert "proximo" in resposta.headers["Location"]
