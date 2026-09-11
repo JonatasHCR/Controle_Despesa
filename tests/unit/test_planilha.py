@@ -574,14 +574,35 @@ def test_subtotal_e_descartado_em_qualquer_nivel(celulas, motivo):
     assert eh_linha_de_total(celulas, MAPA), f"não pegou o subtotal por {motivo}"
 
 
-def test_fornecedor_chamado_total_nao_e_subtotal():
-    """"TOTAL DISTRIBUIDORA" é fornecedor legítimo; o que distingue é o resto
-    da linha estar preenchido."""
-    lancamento = [
-        2010, 12, 30, "31/12/2010", 999, "DISTRIBUIDORA Total", "4561",
-        "COMBUSTIVEL", "abastecimento", "DOC1", -10, -10,
-    ]
-    assert not eh_linha_de_total(lancamento, MAPA)
+CAMPOS_DE_ROTULO = [
+    "ANO_BAIXA", "MES_BAIXA", "DIA_BAIXA", "DATAEMISSAO", "REFERENCIA",
+    "FORNECEDOR", "CR_REDUZIDO", "NATUREZA", "HISTORICO", "DOCUMENTO",
+]
+LANCAMENTO = [2010, 12, 30, "31/12/2010", 999, "FORN", "4561", "NAT", "hist", "DOC1"]
+
+
+@pytest.mark.parametrize("posicao,campo", list(enumerate(CAMPOS_DE_ROTULO)))
+def test_lancamento_real_com_total_no_nome_nao_e_descartado(posicao, campo):
+    """"TOTAL DISTRIBUIDORA" é fornecedor legítimo. O que distingue o subtotal
+    é o resto da linha estar vazio, não o sufixo."""
+    linha = list(LANCAMENTO)
+    linha[posicao] = f"{linha[posicao]} Total"
+    assert not eh_linha_de_total(linha + [-10, -10], MAPA)
+
+
+@pytest.mark.parametrize("posicao,campo", list(enumerate(CAMPOS_DE_ROTULO[:-1])))
+def test_subtotal_pego_em_todo_nivel_menos_o_ultimo(posicao, campo):
+    linha = LANCAMENTO[:posicao] + [f"{LANCAMENTO[posicao]} Total"]
+    linha += [None] * (len(CAMPOS_DE_ROTULO) - posicao - 1)
+    assert eh_linha_de_total(linha + [-10, -10], MAPA)
+
+
+def test_subtotal_por_documento_nao_e_detectavel():
+    """DOCUMENTO é a última coluna: sem célula vazia à direita não há como
+    distingui-lo de um lançamento. Agrupar por documento, que é quase único por
+    linha, não existe na prática — e preferimos manter o lançamento."""
+    linha = LANCAMENTO[:-1] + ["NF Total", -10, -10]
+    assert not eh_linha_de_total(linha, MAPA)
 
 
 def test_linha_normal_nao_e_subtotal():

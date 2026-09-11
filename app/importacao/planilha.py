@@ -120,6 +120,14 @@ def eh_linha_de_total(celulas: list, mapa: dict | None = None) -> bool:
 
     if not rotulos:
         return False
+
+    # Precisa ter sobrado coluna vazia a direita. Sem essa exigencia, um
+    # lancamento cujo DOCUMENTO (a ultima coluna) terminasse em " Total" seria
+    # descartado — e agrupar por documento, que e quase unico por linha, nao
+    # existe na pratica.
+    if len(rotulos) >= limite:
+        return False
+
     ultimo = rotulos[-1]
     return isinstance(ultimo, str) and ultimo.rstrip().endswith(" Total")
 
