@@ -1102,3 +1102,24 @@ td.sem-nota { color: var(--faint); }
   gap: var(--e2);
   margin-left: auto;
 }
+
+/* --- recorte dos gráficos ------------------------------------------------ */
+
+.escolha-do-grafico select {
+  font-size: .78rem;
+  padding: 2px var(--e1);
+  max-width: 170px;
+}
+
+/* --- cabeçalho que ordena ------------------------------------------------ */
+
+.lancamentos thead a {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.lancamentos thead a:hover { color: var(--brand); }
+.lancamentos th.ordenada { color: var(--ink); }
+.lancamentos .seta { font-size: .7rem; color: var(--brand); }

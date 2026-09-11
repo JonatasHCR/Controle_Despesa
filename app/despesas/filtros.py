@@ -22,11 +22,30 @@ ORDENS = {
     "data": Despesa.data_baixa,
     "emissao": Despesa.data_emissao,
     "valor": Despesa.valor_baixado,
+    "original": Despesa.valor_original,
     "referencia": Despesa.referencia,
     "documento": Despesa.documento,
+    "historico": Despesa.historico,
+    "fornecedor": Fornecedor.nome,
+    "natureza": Natureza.nome,
+    "centro": CentroCusto.codigo,
+}
+
+# Ordenar por nome exige a tabela do dominio no FROM. O lazy="joined" do modelo
+# usa alias proprio, e nao serve para o ORDER BY.
+JUNCAO_DA_ORDEM = {
+    "fornecedor": Despesa.fornecedor,
+    "natureza": Despesa.natureza,
+    "centro": Despesa.centro_custo,
 }
 
 AGRUPAMENTOS = ("natureza", "fornecedor", "centro", "ano", "mes", "dia")
+
+ORDENS_DO_GRUPO = {
+    "maior": lambda rotulo: func.sum(Despesa.valor_baixado).desc(),
+    "menor": lambda rotulo: func.sum(Despesa.valor_baixado).asc(),
+    "alfabetica": lambda rotulo: rotulo.asc(),
+}
 
 ZERO = Decimal("0.00")
 
@@ -77,8 +96,16 @@ def aplicar(consulta: Select, filtro: Filtro) -> Select:
 
     if filtro.ordem not in ORDENS:
         raise ValueError(f"campo de ordenacao desconhecido: {filtro.ordem!r}")
+
+    juncao = JUNCAO_DA_ORDEM.get(filtro.ordem)
+    if juncao is not None:
+        consulta = consulta.join(juncao)
+
     coluna = ORDENS[filtro.ordem]
-    return consulta.order_by(coluna.desc() if filtro.decrescente else coluna.asc())
+    ordenada = coluna.desc() if filtro.decrescente else coluna.asc()
+    # Desempate estavel: sem ele, duas despesas do mesmo dia trocam de lugar
+    # entre paginas e a pessoa ve a mesma linha duas vezes.
+    return consulta.order_by(ordenada, Despesa.id.asc())
 
 
 def totais(session, filtro: Filtro) -> Resumo:
@@ -102,9 +129,11 @@ def totais(session, filtro: Filtro) -> Resumo:
     )
 
 
-def agrupar(session, filtro: Filtro, *, por: str) -> list[LinhaAgrupada]:
+def agrupar(session, filtro: Filtro, *, por: str, ordem: str = "maior") -> list[LinhaAgrupada]:
     if por not in AGRUPAMENTOS:
         raise ValueError(f"agrupamento desconhecido: {por!r}")
+    if ordem not in ORDENS_DO_GRUPO:
+        raise ValueError(f"ordenacao desconhecida: {ordem!r}")
 
     rotulo, juncao, cronologico = _eixo(por, filtro)
 
@@ -117,9 +146,13 @@ def agrupar(session, filtro: Filtro, *, por: str) -> list[LinhaAgrupada]:
         consulta = consulta.join(juncao)
     consulta = _condicoes(consulta, filtro).group_by(rotulo)
 
-    # Serie temporal sai em ordem de tempo; o resto, do maior para o menor.
+    # Serie temporal sai sempre em ordem de tempo. Ordenar pelo rotulo seria
+    # ordem alfabetica: "01/11/2010" viria antes de "03/11/2010" mas tambem de
+    # "01/12/2009". Por isso ordena pela data de verdade.
     consulta = consulta.order_by(
-        rotulo.asc() if cronologico else func.sum(Despesa.valor_baixado).desc()
+        func.min(filtro.coluna_de_data).asc()
+        if cronologico
+        else ORDENS_DO_GRUPO[ordem](rotulo)
     )
 
     return [

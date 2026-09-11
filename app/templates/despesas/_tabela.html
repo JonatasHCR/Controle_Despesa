@@ -22,16 +22,28 @@
             <input type="checkbox" data-marcar-todos aria-label="Marcar as desta página">
           </th>
         {% endif %}
-        <th class="c-data">Baixa</th>
-        <th class="c-data">Emissão</th>
-        <th class="c-ref">Ref.</th>
-        <th class="c-cc">CC</th>
-        <th class="c-doc">Documento</th>
-        <th class="c-forn">Fornecedor</th>
-        <th class="c-nat">Natureza</th>
-        <th class="c-hist">Histórico</th>
-        <th class="c-valor numero">Original</th>
-        <th class="c-valor numero">Baixado</th>
+        {#- Cabeçalho que ordena: clicar no mesmo campo inverte o sentido. -#}
+        {% macro coluna(chave, rotulo, classe) %}
+          {% set atual = filtro.ordem == chave %}
+          {% set inverter = '0' if (atual and filtro.decrescente) else '1' %}
+          <th class="{{ classe }}{{ ' ordenada' if atual }}">
+            <a href="{{ url_for(request.endpoint, ordem=chave, desc=inverter, **query_ordem) }}"
+               title="Ordenar por {{ rotulo | lower }}">
+              {{ rotulo }}{% if atual %}<span class="seta">{{ '↓' if filtro.decrescente else '↑' }}</span>{% endif %}
+            </a>
+          </th>
+        {% endmacro %}
+
+        {{ coluna('data', 'Baixa', 'c-data') }}
+        {{ coluna('emissao', 'Emissão', 'c-data') }}
+        {{ coluna('referencia', 'Ref.', 'c-ref') }}
+        {{ coluna('centro', 'CC', 'c-cc') }}
+        {{ coluna('documento', 'Documento', 'c-doc') }}
+        {{ coluna('fornecedor', 'Fornecedor', 'c-forn') }}
+        {{ coluna('natureza', 'Natureza', 'c-nat') }}
+        {{ coluna('historico', 'Histórico', 'c-hist') }}
+        {{ coluna('original', 'Original', 'c-valor numero') }}
+        {{ coluna('valor', 'Baixado', 'c-valor numero') }}
         <th class="c-situacao numero">Situação</th>
         {% if usuario.pode_escrever %}
           <th class="c-acao so-tela"><span class="oculto">Ações</span></th>

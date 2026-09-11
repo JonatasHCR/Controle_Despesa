@@ -39,7 +39,11 @@ def filtro_da_query(args, *, sessao=None) -> Filtro:
         valor_maximo=_decimal(args.get("valor_maximo")),
         somente_divergentes=args.get("divergentes") in ("1", "true", "on"),
         ordem=ordem if ordem in ORDENS else "data",
-        decrescente=args.get("desc") in ("1", "true", "on"),
+        # Sem `desc` na URL, o padrao e decrescente: a tela abre nas despesas
+        # mais recentes, que e o que se quer ver primeiro.
+        decrescente=(
+            args["desc"] in ("1", "true", "on") if "desc" in args else True
+        ),
     )
 
 

@@ -24,6 +24,20 @@
     window.location.href = seletor.value;
   });
 
+  // <select data-enviar-ao-mudar> dentro de um form GET.
+  document.addEventListener('change', function (evento) {
+    var campo = evento.target.closest('[data-enviar-ao-mudar]');
+    if (!campo) return;
+    var formulario = campo.closest('form');
+    if (!formulario) return;
+    // Trocar o mês descarta o dia: 31 não existe em fevereiro.
+    if (campo.name === 'mes') {
+      var dia = formulario.querySelector('[name="dia"]');
+      if (dia) dia.value = '';
+    }
+    formulario.submit();
+  });
+
   // --- múltipla escolha: cada chip carrega um hidden com o nome do campo ---
 
   function chipDoValor(campo, valor) {

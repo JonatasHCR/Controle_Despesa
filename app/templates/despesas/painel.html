@@ -106,18 +106,47 @@
     {% endif %}
   </section>
 
+  {% macro campos_ocultos(exceto) %}
+    {% for chave, valores in query_completa.items() %}
+      {% if chave != exceto %}
+        {% for valor in valores %}
+          <input type="hidden" name="{{ chave }}" value="{{ valor }}">
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+  {% endmacro %}
+
   <section class="graficos">
     <div class="cartao">
       <div class="cartao-topo">
-        <h2>Despesa por natureza</h2>
-        <span class="legenda-cartao">maior primeiro</span>
+        <h2>Despesa por natureza{% if rotulo %} · {{ rotulo }}{% endif %}</h2>
+        <form method="get" action="{{ url_for('despesas.painel') }}" class="escolha-do-grafico">
+          {{ campos_ocultos('ordem_natureza') }}
+          <label class="oculto" for="ordem-natureza">Ordenar naturezas</label>
+          <select id="ordem-natureza" name="ordem_natureza" data-enviar-ao-mudar>
+            {% for chave, texto in ordens_da_natureza.items() %}
+              <option value="{{ chave }}" {% if chave == ordem_natureza %}selected{% endif %}>{{ texto }}</option>
+            {% endfor %}
+          </select>
+          <noscript><button type="submit" class="botao botao-mini">Ver</button></noscript>
+        </form>
       </div>
       {{ grafico_natureza }}
     </div>
+
     <div class="cartao">
       <div class="cartao-topo">
-        <h2>Despesa por mês</h2>
-        <span class="legenda-cartao">{{ periodo_dos_meses }}</span>
+        <h2>Despesa por {{ visoes[ver] }}{% if rotulo %} · {{ rotulo }}{% endif %}</h2>
+        <form method="get" action="{{ url_for('despesas.painel') }}" class="escolha-do-grafico">
+          {{ campos_ocultos('ver') }}
+          <label class="oculto" for="ver">Agrupar o tempo por</label>
+          <select id="ver" name="ver" data-enviar-ao-mudar>
+            {% for chave, texto in visoes.items() %}
+              <option value="{{ chave }}" {% if chave == ver %}selected{% endif %}>por {{ texto }}</option>
+            {% endfor %}
+          </select>
+          <noscript><button type="submit" class="botao botao-mini">Ver</button></noscript>
+        </form>
       </div>
       {{ grafico_mes }}
     </div>

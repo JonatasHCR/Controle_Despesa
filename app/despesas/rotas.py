@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import date
 from decimal import Decimal
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
@@ -17,7 +18,7 @@ from app.despesas.consulta import (
     opcoes,
     query_sem,
 )
-from app.despesas.filtros import agrupar, aplicar, totais
+from app.despesas.filtros import ORDENS_DO_GRUPO, agrupar, aplicar, totais
 from app.extensions import db
 from app.formato import mes_curto
 from app.graficos import svg
@@ -34,16 +35,25 @@ def painel():
     filtro = filtro_da_query(request.args, sessao=db.session)
     resumo = totais(db.session, filtro)
 
-    por_natureza = agrupar(db.session, filtro, por="natureza")
-    por_mes = agrupar(db.session, filtro, por="mes")
+    # Os gráficos leem o mesmo filtro; o que o usuário escolhe é como fatiar o
+    # tempo e em que ordem ver as naturezas.
+    do_grafico, rotulo = _periodo_padrao(filtro)
+    ver = request.args.get("ver") if request.args.get("ver") in VISOES else "mes"
+    ordem = request.args.get("ordem_natureza")
+    if ordem not in ORDENS_DO_GRUPO:
+        ordem = "maior"
 
+    por_natureza = agrupar(db.session, do_grafico, por="natureza", ordem=ordem)
+    no_tempo = agrupar(db.session, do_grafico, por=ver)
+
+    sufixo = f" · {rotulo}" if rotulo else ""
     grafico_natureza = svg.barras_horizontais(
         [(linha.rotulo, linha.total) for linha in por_natureza],
-        titulo="Despesa por natureza",
+        titulo=f"Despesa por natureza{sufixo}",
     )
     grafico_mes = svg.colunas(
-        [(_rotulo_de_mes(linha.rotulo), linha.total) for linha in por_mes],
-        titulo="Despesa por mês",
+        [(_rotulo_no_tempo(linha.rotulo, ver), linha.total) for linha in no_tempo],
+        titulo=f"Despesa por {VISOES[ver]}{sufixo}",
     )
 
     pagina = _pagina(filtro)
@@ -58,13 +68,19 @@ def painel():
         grafico_mes=grafico_mes,
         pagina=pagina,
         chips=chips_do_filtro(request.args),
-        meses=len(por_mes),
-        periodo_dos_meses=_periodo(por_mes),
+        meses=len(agrupar(db.session, filtro, por="mes")),
+        periodos=len(no_tempo),
+        ver=ver,
+        visoes=VISOES,
+        ordem_natureza=ordem,
+        ordens_da_natureza=ORDENS_DA_NATUREZA,
+        rotulo=rotulo,
         fornecedor_divergente=_fornecedor_das_divergencias(filtro),
         # Sem "divergentes" para o link "ver os divergentes" poder acrescentá-lo;
         # com ele no do relatório, que precisa do recorte inteiro.
         query_base=query_sem(request.args, "pagina", "divergentes"),
         query_completa=query_sem(request.args, "pagina"),
+        query_ordem=query_sem(request.args, "pagina", "ordem", "desc"),
     )
 
 
@@ -84,6 +100,7 @@ def lista():
         "grupos": agrupar(db.session, filtro, por=por) if por else None,
         "chips": chips_do_filtro(request.args),
         "query_base": query_sem(request.args, "pagina"),
+        "query_ordem": query_sem(request.args, "pagina", "ordem", "desc"),
     }
 
     # Pedido do HTMX: so a tabela volta, sem o cabecalho e sem os filtros.
@@ -239,6 +256,26 @@ def excluir(identificador: int):
     return _de_volta_para_a_lista()
 
 
+VISOES = {"ano": "ano", "mes": "mês", "dia": "dia"}
+
+ORDENS_DA_NATUREZA = {
+    "maior": "maior primeiro",
+    "menor": "menor primeiro",
+    "alfabetica": "ordem alfabética",
+}
+
+
+def _periodo_padrao(filtro):
+    """Sem período no filtro, os gráficos ficam no ano corrente.
+
+    Com anos de histórico, somar tudo junto esconde mais do que mostra.
+    """
+    if filtro.inicio or filtro.fim:
+        return filtro, ""
+    ano = date.today().year
+    return replace(filtro, inicio=date(ano, 1, 1), fim=date(ano, 12, 31)), str(ano)
+
+
 def _de_volta_para_a_lista():
     """A lista com o mesmo recorte de onde a ação partiu."""
     return redirect(url_for("despesas.lista", **query_sem(request.args)))
@@ -266,6 +303,15 @@ def _periodo(por_mes) -> str:
     if primeiro[3:] == ultimo[3:]:
         return f"{_rotulo_de_mes(primeiro)} – {_rotulo_de_mes(ultimo)} {ultimo[3:]}"
     return f"{_rotulo_de_mes(primeiro)}/{primeiro[3:]} – {_rotulo_de_mes(ultimo)}/{ultimo[3:]}"
+
+
+def _rotulo_no_tempo(rotulo: str, granularidade: str) -> str:
+    """MM/YYYY vira "mar"; DD/MM/YYYY vira so o dia."""
+    if granularidade == "dia":
+        return rotulo[:5]
+    if granularidade == "ano":
+        return rotulo
+    return _rotulo_de_mes(rotulo)
 
 
 def _fornecedor_das_divergencias(filtro) -> str | None:
