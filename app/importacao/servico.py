@@ -128,13 +128,13 @@ def gravar(session, previa: Previa, *, usuario=None, progresso=None) -> Importac
     return importacao
 
 
-# Um upsert de N linhas gasta N x colunas parametros, e o teto e 65535. Com 12
-# colunas, 2000 linhas por comando deixa folga.
+# N linhas x 12 colunas parametros; o teto do PostgreSQL e 65535.
 LINHAS_POR_LOTE = 2_000
 
 # Espelha o indice uq_despesa_natural. Mudar um, mudar o outro.
 ALVO_DO_CONFLITO = (
     Despesa.referencia,
+    Despesa.data_baixa,
     Despesa.fornecedor_id,
     Despesa.natureza_id,
     Despesa.centro_custo_id,
@@ -145,7 +145,6 @@ ALVO_DO_CONFLITO = (
 # Atualizadas na reimportacao. `divergencia_ignorada` fica de fora de proposito:
 # quem marcou "nao comparar" nao pode perder isso ao reimportar.
 COLUNAS_DA_PLANILHA = (
-    "data_baixa",
     "data_emissao",
     "centro_custo_id",
     "fornecedor_id",
@@ -162,11 +161,8 @@ def _gravar_em_lote(
     session, linhas, *, importacao_id, centros, fornecedores, naturezas, usuario_id,
     progresso=None,
 ) -> tuple[int, int]:
-    """Upsert por `referencia`, em executemany.
-
-    A contagem sai de uma consulta previa, e nao de um RETURNING por linha:
-    devolver 180 mil linhas so para contar custava mais que a propria gravacao.
-    """
+    """Upsert em executemany. A contagem sai de consulta previa: um RETURNING
+    por linha custava mais que a propria gravacao."""
     ja_existiam = _chaves_existentes(session, linhas)
 
     inserir = pg_insert(Despesa)
@@ -242,18 +238,12 @@ def _centros_inexistentes(session, codigos: set[str]) -> list[str]:
     return sorted(codigo for codigo in codigos if codigo not in ja_tem)
 
 
-# O PostgreSQL aceita no maximo 65535 parametros por comando, e o IN gasta um
-# por referencia. Uma planilha grande estourava isso e sujava a sessao, o que
-# aparecia como 500 varios passos adiante.
+# O IN gasta um parametro por referencia; acima de 65535 o comando falha.
 LOTE_DE_PARAMETROS = 10_000
 
 
 def _chaves_existentes(session, linhas: list[LinhaPlanilha]) -> set[tuple]:
-    """As chaves naturais que a base ja tem, entre as referencias da planilha.
-
-    Contar so por `referencia` daria numero errado: a mesma referencia com outro
-    fornecedor e lancamento novo, nao atualizacao.
-    """
+    """Contar so por referencia erraria: a mesma com outro fornecedor e nova."""
     referencias = sorted({linha.referencia for linha in linhas})
     if not referencias:
         return set()
@@ -261,6 +251,7 @@ def _chaves_existentes(session, linhas: list[LinhaPlanilha]) -> set[tuple]:
     consulta = (
         select(
             Despesa.referencia,
+            Despesa.data_baixa,
             func.upper(Fornecedor.nome),
             func.upper(Natureza.nome),
             CentroCusto.codigo,

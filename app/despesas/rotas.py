@@ -324,6 +324,7 @@ def _preencher(despesa: Despesa, form) -> str | None:
     duplicada = db.session.scalars(
         select(Despesa).where(
             Despesa.referencia == referencia,
+            Despesa.data_baixa == data_baixa,
             Despesa.fornecedor_id == fornecedor.id,
             Despesa.natureza_id == natureza.id,
             Despesa.centro_custo_id == centro.id,
@@ -334,8 +335,9 @@ def _preencher(despesa: Despesa, form) -> str | None:
     ).first()
     if duplicada is not None:
         return (
-            f"Já existe um lançamento com a referência {referencia} e o mesmo "
-            "fornecedor, natureza, centro de custo, documento e histórico."
+            f"Já existe um lançamento com a referência {referencia} na mesma data "
+            "de baixa e com o mesmo fornecedor, natureza, centro de custo, "
+            "documento e histórico."
         )
 
     despesa.referencia = referencia

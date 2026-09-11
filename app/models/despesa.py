@@ -86,11 +86,11 @@ class Despesa(db.Model):
     importacao = relationship("Importacao", back_populates="despesas")
 
     __table_args__ = (
-        # `historico` entra pelo md5: e TEXT, e um valor longo estouraria o
-        # limite de tamanho da linha do indice btree no meio de uma importacao.
+        # historico pelo md5: e TEXT, e um valor longo estoura o btree.
         Index(
             "uq_despesa_natural",
             "referencia",
+            "data_baixa",
             "fornecedor_id",
             "natureza_id",
             "centro_custo_id",

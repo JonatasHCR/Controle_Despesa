@@ -36,10 +36,6 @@ COLUNAS = {
 COLUNAS_ESSENCIAIS = {"REFERENCIA", "FORNECEDOR", "VALOR BAIXADO"}
 LINHAS_ATE_O_CABECALHO = 10
 
-# Colunas onde o Excel escreve o rotulo do subtotal. Nao inclui FORNECEDOR:
-# "TOTAL DISTRIBUIDORA LTDA" e fornecedor legitimo.
-COLUNAS_DE_AGRUPAMENTO = (0, 1, 2, 3)
-
 CENTAVO = Decimal("0.01")
 _ESPACOS = re.compile(r"\s+")
 
@@ -105,13 +101,8 @@ def serial_para_data(serial: float | int) -> date:
 
 
 def eh_linha_de_total(celulas: list, mapa: dict | None = None) -> bool:
-    """Subtotal do Excel: o rotulo termina em ' Total' e e a ULTIMA coisa
-    preenchida antes das colunas de valor.
-
-    Olhar so o sufixo derrubaria um fornecedor chamado "... Total"; exigir que
-    o resto da linha esteja vazio distingue, porque lancamento de verdade
-    sempre traz natureza e documento depois do fornecedor.
-    """
+    """Rotulo terminando em ' Total' e ultima coisa preenchida antes dos valores.
+    So o sufixo derrubaria um fornecedor chamado "... Total"."""
     limite = _inicio_dos_valores(celulas, mapa)
     rotulos = celulas[:limite]
 
@@ -121,10 +112,8 @@ def eh_linha_de_total(celulas: list, mapa: dict | None = None) -> bool:
     if not rotulos:
         return False
 
-    # Precisa ter sobrado coluna vazia a direita. Sem essa exigencia, um
-    # lancamento cujo DOCUMENTO (a ultima coluna) terminasse em " Total" seria
-    # descartado — e agrupar por documento, que e quase unico por linha, nao
-    # existe na pratica.
+    # Sem coluna vazia a direita nao da para distinguir de um DOCUMENTO que
+    # termine em " Total"; preferimos manter o lancamento.
     if len(rotulos) >= limite:
         return False
 
@@ -172,13 +161,10 @@ def ler(origem) -> Resultado:
 
 
 def chave_natural(linha: LinhaPlanilha) -> tuple:
-    """O que o banco considera o mesmo lancamento.
-
-    Fornecedor e natureza sem caixa, como o `obter_ou_criar` casa; centro,
-    documento e historico exatos, como o indice compara.
-    """
+    """Fornecedor e natureza sem caixa, como o obter_ou_criar casa."""
     return (
         linha.referencia,
+        linha.data_baixa,
         linha.fornecedor.upper(),
         linha.natureza.upper(),
         linha.centro_custo,
@@ -188,11 +174,7 @@ def chave_natural(linha: LinhaPlanilha) -> tuple:
 
 
 def _rejeitar_lancamentos_repetidos(resultado: Resultado) -> None:
-    """A mesma referencia pode repetir; ela junto do resto, nao.
-
-    Duas linhas identicas na chave natural quebrariam a gravacao inteira no
-    commit, e o erro chegaria ao usuario como 500.
-    """
+    """Duas linhas iguais na chave natural quebrariam o commit inteiro."""
     vistas: dict[tuple, int] = {}
     repetidas: set[tuple] = set()
     for linha in resultado.linhas:

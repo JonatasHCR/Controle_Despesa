@@ -27,6 +27,9 @@ bp = Blueprint("importacao", __name__, url_prefix="/importacao")
 
 CHAVE_ARQUIVO = "importacao_arquivo"
 
+# Acima disso a gravacao passa do timeout do gunicorn e a pagina cai sem gravar.
+TETO_DE_LINHAS_NA_TELA = 20_000
+
 
 @bp.get("/")
 @requer("operador")
@@ -78,6 +81,19 @@ def previa():
         destino.unlink(missing_ok=True)
         current_app.logger.exception("previa da importacao falhou")
         flash("Não consegui ler essa planilha contra o banco. Tente de novo.", "erro")
+        return redirect(url_for("importacao.enviar"))
+
+    if len(resultado.linhas) > TETO_DE_LINHAS_NA_TELA:
+        destino.unlink(missing_ok=True)
+        quantas = f"{len(resultado.linhas):,}".replace(",", ".")
+        teto = f"{TETO_DE_LINHAS_NA_TELA:,}".replace(",", ".")
+        flash(
+            f"A planilha tem {quantas} lançamentos, acima do limite de {teto} para "
+            "importar pela tela — a gravação passaria do tempo que o servidor espera "
+            "e a página cairia sem gravar nada. Peça a quem administra para rodar "
+            "pelo terminal: flask importar <arquivo>",
+            "erro",
+        )
         return redirect(url_for("importacao.enviar"))
 
     session[CHAVE_ARQUIVO] = {"caminho": str(destino), "nome": arquivo.filename}

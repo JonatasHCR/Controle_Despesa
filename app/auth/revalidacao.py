@@ -18,9 +18,12 @@ MARGEM_SEGUNDOS = 60
 
 
 def _renovar_no_keycloak(refresh_token: str) -> dict:
-    return oauth.keycloak.fetch_access_token(
+    """`fetch_access_token` nao preenche `userinfo`; so o do login faz."""
+    token = oauth.keycloak.fetch_access_token(
         grant_type="refresh_token", refresh_token=refresh_token
     )
+    token["userinfo"] = oauth.keycloak.userinfo(token=token)
+    return token
 
 
 def guardar_sessao(usuario, token: dict, claims: dict) -> None:
