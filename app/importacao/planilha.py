@@ -279,10 +279,22 @@ def _normalizar_numero(valor) -> str:
     com virgula decimal — e recusar isso faria o proprio modelo de importacao
     ser rejeitado.
     """
-    texto = str(valor).strip().replace(" ", "")
+    # Celula numerica ja vem desambiguada pelo Excel: o ponto e decimal, ponto
+    # final. Aplicar heuristica de milhar aqui transformaria 1234.567 em
+    # 1234567.
+    if isinstance(valor, (int, float, Decimal)) and not isinstance(valor, bool):
+        return str(valor)
+
+    texto = str(valor).strip().replace("\xa0", "").replace(" ", "")
     if "," in texto:
         # Com virgula presente, o ponto so pode ser separador de milhar.
         return texto.replace(".", "").replace(",", ".")
+
+    # Texto com so ponto e ambiguo. Em dinheiro digitado a mao, ponto seguido de
+    # exatamente 3 digitos e milhar ("1.234"), e mais de um ponto idem.
+    partes = texto.lstrip("-+").split(".")
+    if len(partes) > 2 or (len(partes) == 2 and len(partes[1]) == 3):
+        return texto.replace(".", "")
     return texto
 
 

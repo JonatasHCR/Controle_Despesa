@@ -405,3 +405,70 @@ def test_arquivo_sem_repeticao_passa_inteiro():
     resultado = ler(planilha_com([501, 502, 503]))
     assert [linha.referencia for linha in resultado.linhas] == [501, 502, 503]
     assert resultado.erros == []
+
+
+# --- ponto e vírgula nos valores -------------------------------------------
+#
+# Célula numérica já vem desambiguada pelo Excel; texto digitado à mão não.
+# Tratar os dois igual quebrava um dos lados.
+
+
+def normalizado(valor):
+    from decimal import ROUND_HALF_UP, Decimal
+
+    from app.importacao.planilha import _normalizar_numero
+
+    return str(
+        Decimal(_normalizar_numero(valor))
+        .copy_abs()
+        .quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    )
+
+
+@pytest.mark.parametrize(
+    "valor,esperado",
+    [
+        (1234.56, "1234.56"),
+        (1234.567, "1234.57"),
+        (0.123, "0.12"),
+        (1000.0, "1000.00"),
+        (10003, "10003.00"),
+        (-693.0, "693.00"),
+    ],
+)
+def test_celula_numerica_vai_como_esta(valor, esperado):
+    """Heurística de milhar aqui viraria 1234.567 em 1234567."""
+    assert normalizado(valor) == esperado
+
+
+@pytest.mark.parametrize(
+    "texto,esperado",
+    [
+        ("1.234,56", "1234.56"),
+        ("1.234.567,89", "1234567.89"),
+        ("-693,00", "693.00"),
+        ("0,50", "0.50"),
+        ("1234.56", "1234.56"),
+        ("1234,5", "1234.50"),
+    ],
+)
+def test_texto_com_virgula_decimal(texto, esperado):
+    assert normalizado(texto) == esperado
+
+
+@pytest.mark.parametrize(
+    "texto,esperado",
+    [
+        ("1.234", "1234.00"),
+        ("12.345", "12345.00"),
+        ("1.000", "1000.00"),
+        ("1.234.567", "1234567.00"),
+    ],
+)
+def test_texto_com_ponto_de_milhar_sem_decimais(texto, esperado):
+    """Lido como decimal, 1.234 virava 1,23 — o valor sumia."""
+    assert normalizado(texto) == esperado
+
+
+def test_espaco_inquebravel_nao_derruba():
+    assert normalizado("1\xa0234,56") == "1234.56"
