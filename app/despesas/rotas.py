@@ -37,8 +37,8 @@ def painel():
 
     # Os gráficos leem o mesmo filtro; o que o usuário escolhe é como fatiar o
     # tempo e em que ordem ver as naturezas.
-    do_grafico, rotulo = _periodo_padrao(filtro)
     ver = request.args.get("ver") if request.args.get("ver") in VISOES else "mes"
+    do_grafico, rotulo = _recorte_do_grafico(request.args, filtro, ver)
     ordem = request.args.get("ordem_natureza")
     if ordem not in ORDENS_DO_GRUPO:
         ordem = "maior"
@@ -75,6 +75,9 @@ def painel():
         ordem_natureza=ordem,
         ordens_da_natureza=ORDENS_DA_NATUREZA,
         rotulo=rotulo,
+        anos=_anos_com_lancamento(db.session),
+        ano_escolhido=do_grafico.inicio.year,
+        dia_escolhido=do_grafico.inicio.isoformat(),
         fornecedor_divergente=_fornecedor_das_divergencias(filtro),
         # Sem "divergentes" para o link "ver os divergentes" poder acrescentá-lo;
         # com ele no do relatório, que precisa do recorte inteiro.
@@ -265,15 +268,46 @@ ORDENS_DA_NATUREZA = {
 }
 
 
-def _periodo_padrao(filtro):
-    """Sem período no filtro, os gráficos ficam no ano corrente.
+ANOS_NO_GRAFICO = 6
 
-    Com anos de histórico, somar tudo junto esconde mais do que mostra.
+
+def _recorte_do_grafico(args, filtro, ver: str):
+    """O período que cada visão desenha, e o rótulo dela.
+
+    Por ano: os últimos anos. Por mês: os doze meses de um ano. Por dia: um dia
+    só. O resto do filtro continua valendo — o período é apenas recortado.
     """
-    if filtro.inicio or filtro.fim:
-        return filtro, ""
-    ano = date.today().year
-    return replace(filtro, inicio=date(ano, 1, 1), fim=date(ano, 12, 31)), str(ano)
+    from app.despesas.consulta import _data, _inteiro
+
+    hoje = date.today()
+
+    if ver == "dia":
+        escolhido = _data(args.get("dia")) or hoje
+        inicio = fim = escolhido
+        rotulo = escolhido.strftime("%d/%m/%Y")
+    elif ver == "mes":
+        ano = _inteiro(args.get("ano")) or hoje.year
+        inicio, fim = date(ano, 1, 1), date(ano, 12, 31)
+        rotulo = str(ano)
+    else:
+        inicio = date(hoje.year - ANOS_NO_GRAFICO + 1, 1, 1)
+        fim = date(hoje.year, 12, 31)
+        rotulo = f"{inicio.year}–{fim.year}"
+
+    # Período escrito no filtro estreita o da visão; nunca o alarga.
+    if filtro.inicio and filtro.inicio > inicio:
+        inicio = filtro.inicio
+    if filtro.fim and filtro.fim < fim:
+        fim = filtro.fim
+
+    return replace(filtro, inicio=inicio, fim=fim), rotulo
+
+
+def _anos_com_lancamento(session) -> list[int]:
+    from sqlalchemy import Integer, extract
+
+    ano = extract("year", Despesa.data_baixa).cast(Integer)
+    return [int(item) for item in session.scalars(select(ano).distinct().order_by(ano.desc()))]
 
 
 def _de_volta_para_a_lista():

@@ -138,13 +138,34 @@
       <div class="cartao-topo">
         <h2>Despesa por {{ visoes[ver] }}{% if rotulo %} · {{ rotulo }}{% endif %}</h2>
         <form method="get" action="{{ url_for('despesas.painel') }}" class="escolha-do-grafico">
-          {{ campos_ocultos('ver') }}
+          {% for chave, valores in query_completa.items() %}
+            {% if chave not in ('ver', 'ano', 'dia') %}
+              {% for valor in valores %}
+                <input type="hidden" name="{{ chave }}" value="{{ valor }}">
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+
           <label class="oculto" for="ver">Agrupar o tempo por</label>
           <select id="ver" name="ver" data-enviar-ao-mudar>
             {% for chave, texto in visoes.items() %}
               <option value="{{ chave }}" {% if chave == ver %}selected{% endif %}>por {{ texto }}</option>
             {% endfor %}
           </select>
+
+          {% if ver == 'mes' %}
+            <label class="oculto" for="ano-do-grafico">Ano</label>
+            <select id="ano-do-grafico" name="ano" data-enviar-ao-mudar>
+              {% for item in anos %}
+                <option value="{{ item }}" {% if item == ano_escolhido %}selected{% endif %}>{{ item }}</option>
+              {% endfor %}
+            </select>
+          {% elif ver == 'dia' %}
+            <label class="oculto" for="dia-do-grafico">Dia</label>
+            <input type="date" id="dia-do-grafico" name="dia" value="{{ dia_escolhido }}"
+                   data-enviar-ao-mudar>
+          {% endif %}
+
           <noscript><button type="submit" class="botao botao-mini">Ver</button></noscript>
         </form>
       </div>

@@ -138,15 +138,18 @@ def test_campos_longos_cortam_com_reticencias(entrar, leitor, carregado):
 
 def test_o_valor_inteiro_fica_no_title(entrar, leitor, carregado):
     """Cortar na tela nao pode esconder a informacao."""
-    corpo = entrar(leitor).get("/despesas").get_data(as_text=True)
-    assert 'title="PRESTAÇÃO DE SERVIÇOS REF MES 12/2025"' in corpo
+    # Filtra em vez de contar com a página 1: a ordem padrão é por data
+    # decrescente, e a linha pode estar em qualquer página.
+    corpo = entrar(leitor).get("/despesas?busca=PRESTAÇÃO DE SERVIÇOS REF MES 12/2025")
+    assert 'title="PRESTAÇÃO DE SERVIÇOS REF MES 12/2025"' in corpo.get_data(as_text=True)
 
 
 def test_todas_as_colunas_estao_presentes(entrar, leitor, carregado):
     corpo = entrar(leitor).get("/despesas").get_data(as_text=True)
+    # Os cabeçalhos ordenáveis viraram links, então o texto não encosta no `<`.
     for cabecalho in ("Baixa", "Emissão", "Ref.", "CC", "Documento", "Fornecedor",
                       "Natureza", "Histórico", "Original", "Baixado", "Situação"):
-        assert f">{cabecalho}<" in corpo
+        assert cabecalho in corpo
 
 
 # --- a coluna Situação ------------------------------------------------------
@@ -169,6 +172,8 @@ def test_lancamento_normal_nao_tem_selo_de_diferenca(entrar, leitor, carregado):
 
 def test_o_historico_continua_na_tabela(entrar, leitor, carregado):
     """Foi pedido explicitamente: todos os campos visíveis."""
-    corpo = entrar(leitor).get("/despesas").get_data(as_text=True)
-    assert ">Histórico<" in corpo
+    corpo = entrar(leitor).get(
+        "/despesas?busca=PRESTAÇÃO DE SERVIÇOS REF MES 12/2025"
+    ).get_data(as_text=True)
+    assert "Histórico" in corpo
     assert "PRESTAÇÃO DE SERVIÇOS REF MES 12/2025" in corpo
