@@ -1034,3 +1034,71 @@ td.sem-nota { color: var(--faint); }
   border-color: var(--brand);
   background: var(--brand-soft);
 }
+
+/* --- campos de múltipla escolha ------------------------------------------ */
+
+.campo-multi { min-width: 190px; }
+.campo-multi.campo-curto { width: 150px; }
+
+.escolhidos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e1);
+}
+.escolhidos:not(:empty) { margin-bottom: var(--e1); }
+
+.chip-escolhido {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e1);
+  padding: 2px var(--e1) 2px var(--e2);
+  border: 1px solid var(--hairline-forte);
+  border-radius: 999px;
+  background: var(--sunken);
+  font-size: .78rem;
+  line-height: 1.5;
+  max-width: 100%;
+}
+.chip-escolhido > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tirar-escolhido {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: .95rem;
+  line-height: 1;
+  border-radius: 999px;
+}
+.tirar-escolhido:hover { background: var(--brand-soft); color: var(--brand); }
+
+/* --- barra da seleção em lote -------------------------------------------- */
+
+.barra-selecao {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--e2);
+  margin-bottom: var(--e3);
+  padding: var(--e2) var(--e3);
+  border: 1px solid var(--hairline-forte);
+  border-radius: var(--r2, 8px);
+  background: var(--sunken);
+  font-size: .85rem;
+}
+.barra-selecao [data-nesta-pagina] { color: var(--muted); }
+.barra-selecao button { margin-left: var(--e1); }
+
+.c-marca { width: 32px; text-align: center; }
+.c-marca input { cursor: pointer; }
+
+.acoes-do-recorte {
+  display: flex;
+  gap: var(--e2);
+  margin-left: auto;
+}

@@ -28,35 +28,31 @@
            value="{{ filtro.fim.isoformat() if filtro.fim else '' }}">
   </div>
 
-  <div class="campo campo-curto">
-    <label for="centro">Centro de custo</label>
-    <input type="search" id="centro" name="centro" list="opcoes-centro"
-           placeholder="todos" autocomplete="off"
-           value="{{ termo('centro') }}">
-    <datalist id="opcoes-centro">
-      {% for codigo in opcoes.centros %}<option value="{{ codigo }}">{% endfor %}
-    </datalist>
-  </div>
-
-  <div class="campo campo-medio">
-    <label for="natureza">Natureza</label>
-    <input type="search" id="natureza" name="natureza" list="opcoes-natureza"
-           placeholder="todas" autocomplete="off"
-           value="{{ termo('natureza') }}">
-    <datalist id="opcoes-natureza">
-      {% for nome in opcoes.naturezas %}<option value="{{ nome }}">{% endfor %}
-    </datalist>
-  </div>
-
-  <div class="campo campo-medio">
-    <label for="fornecedor">Fornecedor</label>
-    <input type="search" id="fornecedor" name="fornecedor" list="opcoes-fornecedor"
-           placeholder="todos" autocomplete="off"
-           value="{{ termo('fornecedor') }}">
-    <datalist id="opcoes-fornecedor">
-      {% for nome in opcoes.fornecedores %}<option value="{{ nome }}">{% endfor %}
-    </datalist>
-  </div>
+  {# Cada escolhido vira um hidden próprio: é o que `args.getlist` enxerga. #}
+  {% for campo, rotulo, vazio, lista in [
+       ('centro', 'Centro de custo', 'todos', opcoes.centros),
+       ('natureza', 'Natureza', 'todas', opcoes.naturezas),
+       ('fornecedor', 'Fornecedor', 'todos', opcoes.fornecedores)] %}
+    <div class="campo campo-multi {{ 'campo-curto' if campo == 'centro' else 'campo-medio' }}"
+         data-multi="{{ campo }}">
+      <label for="{{ campo }}-busca">{{ rotulo }}</label>
+      <div class="escolhidos" data-escolhidos>
+        {% for valor in selecionados(campo) %}
+          <span class="chip-escolhido">
+            <span>{{ valor }}</span>
+            <input type="hidden" name="{{ campo }}" value="{{ valor }}">
+            <button type="button" class="tirar-escolhido" data-tirar-escolhido
+                    aria-label="Tirar {{ valor }}">×</button>
+          </span>
+        {% endfor %}
+      </div>
+      <input type="search" id="{{ campo }}-busca" list="opcoes-{{ campo }}"
+             placeholder="{{ vazio }}" autocomplete="off" data-adicionar>
+      <datalist id="opcoes-{{ campo }}">
+        {% for item in lista %}<option value="{{ item }}">{% endfor %}
+      </datalist>
+    </div>
+  {% endfor %}
 
   <div class="campo campo-largo">
     <label for="busca">Buscar</label>
@@ -95,7 +91,8 @@
       <select id="agrupar" name="agrupar">
         <option value="">nenhum</option>
         {% for chave, rotulo in [('natureza','Natureza'), ('fornecedor','Fornecedor'),
-                                 ('centro','Centro de custo'), ('mes','Mês'), ('dia','Dia')] %}
+                                 ('centro','Centro de custo'), ('ano','Ano'),
+                                 ('mes','Mês'), ('dia','Dia')] %}
           <option value="{{ chave }}" {% if agrupamento == chave %}selected{% endif %}>{{ rotulo }}</option>
         {% endfor %}
       </select>

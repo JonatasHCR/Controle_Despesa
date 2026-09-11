@@ -23,9 +23,9 @@
 
     <div class="acoes mb">
       <a class="botao botao-principal"
-         href="{{ url_for('relatorios.baixar', formato='pdf', **request.args) }}">Baixar PDF</a>
+         href="{{ url_for('relatorios.baixar', formato='pdf', **query_base) }}">Baixar PDF</a>
       <a class="botao"
-         href="{{ url_for('relatorios.baixar', formato='xlsx', **request.args) }}">Baixar Excel</a>
+         href="{{ url_for('relatorios.baixar', formato='xlsx', **query_base) }}">Baixar Excel</a>
     </div>
 
     {% if grupos %}

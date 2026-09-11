@@ -11,6 +11,15 @@
         </span>
       {% endif %}
     </div>
+
+    {# Dentro do #resultado de propósito: o filtro é trocado por HTMX, e daqui
+       de fora estes links ficariam com o recorte de quando a página carregou. #}
+    <div class="acoes-do-recorte">
+      <a class="botao botao-mini" href="{{ url_for('relatorios.baixar', formato='xlsx', **query_base) }}"
+         title="Excel com exatamente este recorte">Excel</a>
+      <a class="botao botao-mini" href="{{ url_for('relatorios.baixar', formato='pdf', **query_base) }}"
+         title="PDF com exatamente este recorte">PDF</a>
+    </div>
   </div>
 
   {% if grupos %}

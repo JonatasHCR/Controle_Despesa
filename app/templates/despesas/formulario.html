@@ -73,6 +73,18 @@
       marcam o lançamento como divergente.
     </p>
 
+    <div class="campo">
+      <label class="selo">
+        <input type="checkbox" name="divergencia_ignorada" value="1"
+               {% if despesa and despesa.divergencia_ignorada %}checked{% endif %}>
+        não comparar original e baixado
+      </label>
+      <p class="legenda-pagina sem-margem">
+        Para baixa parcial que ainda vai crescer: os valores ficam como estão, a
+        despesa só deixa de ser sinalizada como divergente.
+      </p>
+    </div>
+
     <div class="acoes">
       <button type="submit" class="botao-principal">Salvar</button>
       <a class="botao" href="{{ url_for('despesas.lista', **request.args) }}">Cancelar</a>

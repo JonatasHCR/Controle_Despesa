@@ -11,8 +11,6 @@
       {% if usuario.pode_escrever %}
         <a class="botao botao-principal" href="{{ url_for('despesas.nova') }}">Nova despesa</a>
       {% endif %}
-      <a class="botao" href="{{ url_for('relatorios.baixar', formato='xlsx', **request.args) }}">Excel</a>
-      <a class="botao" href="{{ url_for('relatorios.baixar', formato='pdf', **request.args) }}">PDF</a>
     </div>
   </div>
 

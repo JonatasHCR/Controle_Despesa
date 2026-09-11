@@ -1,9 +1,27 @@
 {# Largura fixa por coluna e reticências nos campos de texto: os onze campos
    cabem na tela sem barra lateral. O valor inteiro fica no `title`. #}
+{% if usuario.pode_escrever %}
+  <form id="acao-em-lote" method="post" data-forma-lote
+        action="{{ url_for('despesas.divergencia_em_lote', **query_base) }}">
+    {{ form_csrf() }}
+    <div class="barra-selecao" data-barra-selecao hidden>
+      <span><strong data-contagem>0</strong> selecionada(s)<span data-nesta-pagina></span></span>
+      <button type="submit" name="acao" value="ignorar" class="botao botao-mini">Não comparar</button>
+      <button type="submit" name="acao" value="comparar" class="botao botao-mini">Voltar a comparar</button>
+      <button type="button" class="botao botao-mini" data-limpar-selecao>Limpar seleção</button>
+    </div>
+  </form>
+{% endif %}
+
 <div class="rolagem">
   <table class="lancamentos">
     <thead>
       <tr>
+        {% if usuario.pode_escrever %}
+          <th class="c-marca so-tela">
+            <input type="checkbox" data-marcar-todos aria-label="Marcar as desta página">
+          </th>
+        {% endif %}
         <th class="c-data">Baixa</th>
         <th class="c-data">Emissão</th>
         <th class="c-ref">Ref.</th>
@@ -23,6 +41,13 @@
     <tbody>
       {% for despesa in pagina.items %}
         <tr {% if despesa.divergente %}class="linha-divergente"{% endif %}>
+          {% if usuario.pode_escrever %}
+            <td class="c-marca so-tela">
+              <input type="checkbox" form="acao-em-lote" name="ids" value="{{ despesa.id }}"
+                     data-selecionavel
+                     aria-label="Selecionar a despesa {{ despesa.referencia }}">
+            </td>
+          {% endif %}
           <td>{{ despesa.data_baixa | data }}</td>
           <td class="discreto">{{ despesa.data_emissao | data }}</td>
           <td>{{ despesa.referencia }}</td>
@@ -51,6 +76,11 @@
                     title="Original e baixado divergem em {{ despesa.diferenca | moeda }}">
                 ⚠ <span class="num">{{ despesa.diferenca | sinal }}</span>
               </span>
+            {% elif despesa.divergencia_ignorada and despesa.diverge_nos_valores %}
+              <span class="sem-nota"
+                    title="Diferença de {{ despesa.diferenca | moeda }}, não sinalizada por escolha.">
+                não comparar
+              </span>
             {% else %}
               <span class="sem-nota">—</span>
             {% endif %}
@@ -77,7 +107,7 @@
         </tr>
       {% else %}
         <tr>
-          <td colspan="{{ 12 if usuario.pode_escrever else 11 }}" class="vazio">
+          <td colspan="{{ 13 if usuario.pode_escrever else 11 }}" class="vazio">
             Nenhuma despesa para este filtro.
           </td>
         </tr>

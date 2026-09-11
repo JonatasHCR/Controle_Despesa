@@ -13,7 +13,7 @@
     </div>
     <div class="acoes">
       <a class="botao" href="{{ url_for('despesas.lista', **request.args) }}">Ver lançamentos</a>
-      <a class="botao" href="{{ url_for('relatorios.montar', **request.args) }}">Relatório</a>
+      <a class="botao" href="{{ url_for('relatorios.montar', **query_completa) }}">Relatório</a>
       {% if usuario.pode_escrever %}
         <a class="botao botao-principal" href="{{ url_for('despesas.nova') }}">Nova despesa</a>
       {% endif %}
@@ -93,7 +93,7 @@
           <span class="sinal" aria-hidden="true">✓</span>
           <div>
             <div class="etiqueta">Sem divergências</div>
-            <p>Valor original e valor baixado coincidem em todos os lançamentos do recorte.</p>
+            <p>Valor original e valor baixado coincidem em todos os lançamentos do recorte ou já foram devidamente tratados.</p>
           </div>
         </div>
         <div class="pe">
