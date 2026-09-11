@@ -18,6 +18,7 @@ from sqlalchemy import (
     Text,
     false,
     func,
+    text,
 )
 from sqlalchemy import and_ as sa_and
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -33,8 +34,9 @@ class Despesa(db.Model):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    # Chave natural do ERP; e o que torna a importacao idempotente.
-    referencia: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, index=True)
+    # A mesma referencia pode aparecer em lancamentos distintos; o que nao pode
+    # repetir e ela junto do resto (ver CHAVE_NATURAL).
+    referencia: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
     data_baixa: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     data_emissao: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
@@ -84,6 +86,18 @@ class Despesa(db.Model):
     importacao = relationship("Importacao", back_populates="despesas")
 
     __table_args__ = (
+        # `historico` entra pelo md5: e TEXT, e um valor longo estouraria o
+        # limite de tamanho da linha do indice btree no meio de uma importacao.
+        Index(
+            "uq_despesa_natural",
+            "referencia",
+            "fornecedor_id",
+            "natureza_id",
+            "centro_custo_id",
+            "documento",
+            text("md5(historico)"),
+            unique=True,
+        ),
         CheckConstraint(
             "valor_original IS NULL OR valor_original >= 0", name="ck_despesa_original"
         ),

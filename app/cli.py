@@ -7,6 +7,7 @@ distribuir poder sobre ele.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import click
@@ -66,7 +67,11 @@ def importar(caminho: str, email: str | None, previa: bool) -> None:
         if usuario is None:
             raise click.ClickException(f"{email} nao existe")
 
+    tamanho = arquivo.stat().st_size / 1e6
+    click.echo(f"lendo {arquivo.name} ({tamanho:.1f} MB)...")
+    inicio = time.monotonic()
     resultado = analisar(db.session, arquivo, arquivo_nome=arquivo.name)
+    click.echo(f"lido em {time.monotonic() - inicio:.0f}s\n")
 
     click.echo(f"{len(resultado.linhas)} lancamentos")
     click.echo(f"{resultado.ignoradas} linhas de subtotal ignoradas")
@@ -82,9 +87,25 @@ def importar(caminho: str, email: str | None, previa: bool) -> None:
         click.echo("\n(previa: nada foi gravado)")
         return
 
-    importacao = gravar(db.session, resultado, usuario=usuario)
+    if resultado.ja_importado is not None:
+        quando = resultado.ja_importado.criado_em.strftime("%d/%m/%Y as %H:%M")
+        click.echo(f"\nATENCAO: este arquivo exato ja foi importado em {quando}.")
+        click.confirm("gravar mesmo assim?", abort=True)
+
+    inicio = time.monotonic()
+    with click.progressbar(length=len(resultado.linhas), label="gravando") as barra:
+        vistas = 0
+
+        def andou(feitas: int, _total: int) -> None:
+            nonlocal vistas
+            barra.update(feitas - vistas)
+            vistas = feitas
+
+        importacao = gravar(db.session, resultado, usuario=usuario, progresso=andou)
+
     total = db.session.scalar(select(func.count()).select_from(Despesa))
     click.echo(
-        f"\ngravado: {importacao.criados} criados, {importacao.atualizados} atualizados"
+        f"\ngravado em {time.monotonic() - inicio:.0f}s: "
+        f"{importacao.criados} criados, {importacao.atualizados} atualizados"
     )
     click.echo(f"o banco tem agora {total} despesas")

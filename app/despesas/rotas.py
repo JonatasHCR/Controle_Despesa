@@ -297,12 +297,6 @@ def _preencher(despesa: Despesa, form) -> str | None:
     if referencia is None:
         return "Informe a referência."
 
-    duplicada = db.session.scalars(
-        select(Despesa).where(Despesa.referencia == referencia, Despesa.id != (despesa.id or 0))
-    ).first()
-    if duplicada is not None:
-        return f"Já existe uma despesa com a referência {referencia}."
-
     data_baixa = _data(form.get("data_baixa"))
     if data_baixa is None:
         return "Informe a data de baixa."
@@ -319,14 +313,39 @@ def _preencher(despesa: Despesa, form) -> str | None:
         if not (form.get(campo) or "").strip():
             return f"Informe o {rotulo}."
 
+    centro = CentroCusto.obter_ou_criar(db.session, form["centro_custo"])
+    fornecedor = Fornecedor.obter_ou_criar(db.session, form["fornecedor"])
+    natureza = Natureza.obter_ou_criar(db.session, form["natureza"])
+    historico = (form.get("historico") or "").strip()
+    documento = (form.get("documento") or "").strip()
+    db.session.flush()
+
+    # A referência sozinha pode repetir; ela junto do resto, não.
+    duplicada = db.session.scalars(
+        select(Despesa).where(
+            Despesa.referencia == referencia,
+            Despesa.fornecedor_id == fornecedor.id,
+            Despesa.natureza_id == natureza.id,
+            Despesa.centro_custo_id == centro.id,
+            Despesa.documento == documento,
+            Despesa.historico == historico,
+            Despesa.id != (despesa.id or 0),
+        )
+    ).first()
+    if duplicada is not None:
+        return (
+            f"Já existe um lançamento com a referência {referencia} e o mesmo "
+            "fornecedor, natureza, centro de custo, documento e histórico."
+        )
+
     despesa.referencia = referencia
     despesa.data_baixa = data_baixa
     despesa.data_emissao = _data(form.get("data_emissao"))
-    despesa.centro_custo = CentroCusto.obter_ou_criar(db.session, form["centro_custo"])
-    despesa.fornecedor = Fornecedor.obter_ou_criar(db.session, form["fornecedor"])
-    despesa.natureza = Natureza.obter_ou_criar(db.session, form["natureza"])
-    despesa.historico = (form.get("historico") or "").strip()
-    despesa.documento = (form.get("documento") or "").strip()
+    despesa.centro_custo = centro
+    despesa.fornecedor = fornecedor
+    despesa.natureza = natureza
+    despesa.historico = historico
+    despesa.documento = documento
     despesa.valor_original = valor_original
     despesa.valor_baixado = valor_baixado
     despesa.divergencia_ignorada = form.get("divergencia_ignorada") in ("1", "true", "on")

@@ -11,10 +11,11 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from io import BytesIO
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.auditoria.servico import registrar
-from app.importacao.planilha import ErroLinha, LinhaPlanilha, ler
+from app.importacao.planilha import ErroLinha, LinhaPlanilha, chave_natural, ler
 from app.models import CentroCusto, Despesa, Fornecedor, Importacao, Natureza
 
 
@@ -67,14 +68,16 @@ def analisar(session, origem, *, arquivo_nome: str) -> Previa:
     previa.novas_naturezas = _inexistentes(session, Natureza, {linha.natureza for linha in linhas})
     previa.novos_centros = _centros_inexistentes(session, {linha.centro_custo for linha in linhas})
 
-    existentes = _referencias_existentes(session, [linha.referencia for linha in linhas])
-    previa.a_atualizar = sum(1 for linha in linhas if linha.referencia in existentes)
+    existentes = _chaves_existentes(session, linhas)
+    previa.a_atualizar = sum(1 for linha in linhas if chave_natural(linha) in existentes)
     previa.a_criar = len(linhas) - previa.a_atualizar
 
     return previa
 
 
-def gravar(session, previa: Previa, *, usuario=None) -> Importacao:
+def gravar(session, previa: Previa, *, usuario=None, progresso=None) -> Importacao:
+    """`progresso(feitas, total)` e chamado a cada lote, para a linha de comando
+    nao ficar minutos em silencio numa planilha grande."""
     importacao = Importacao(
         arquivo=previa.arquivo,
         sha256=previa.sha256,
@@ -90,38 +93,16 @@ def gravar(session, previa: Previa, *, usuario=None) -> Importacao:
     # cima dela. De quebra, sao 3 selects no total em vez de 3 por linha.
     centros, fornecedores, naturezas = _resolver_dominio(session, previa.linhas)
 
-    existentes = {
-        despesa.referencia: despesa
-        for despesa in session.scalars(
-            select(Despesa).where(
-                Despesa.referencia.in_([linha.referencia for linha in previa.linhas] or [0])
-            )
-        )
-    }
-
-    criados = atualizados = 0
-    for linha in previa.linhas:
-        despesa = existentes.get(linha.referencia)
-        if despesa is None:
-            despesa = Despesa(referencia=linha.referencia)
-            criados += 1
-        else:
-            atualizados += 1
-
-        despesa.data_baixa = linha.data_baixa
-        despesa.data_emissao = linha.data_emissao
-        despesa.centro_custo = centros[linha.centro_custo.upper()]
-        despesa.fornecedor = fornecedores[linha.fornecedor.upper()]
-        despesa.natureza = naturezas[linha.natureza.upper()]
-        despesa.historico = linha.historico
-        despesa.documento = linha.documento
-        despesa.valor_original = linha.valor_original
-        despesa.valor_baixado = linha.valor_baixado
-        despesa.importacao_id = importacao.id
-        if despesa.criado_por_id is None and usuario is not None:
-            despesa.criado_por_id = usuario.id
-
-        session.add(despesa)
+    criados, atualizados = _gravar_em_lote(
+        session,
+        previa.linhas,
+        importacao_id=importacao.id,
+        centros=centros,
+        fornecedores=fornecedores,
+        naturezas=naturezas,
+        usuario_id=usuario.id if usuario else None,
+        progresso=progresso,
+    )
 
     importacao.criados = criados
     importacao.atualizados = atualizados
@@ -145,6 +126,87 @@ def gravar(session, previa: Previa, *, usuario=None) -> Importacao:
 
     session.commit()
     return importacao
+
+
+# Um upsert de N linhas gasta N x colunas parametros, e o teto e 65535. Com 12
+# colunas, 2000 linhas por comando deixa folga.
+LINHAS_POR_LOTE = 2_000
+
+# Espelha o indice uq_despesa_natural. Mudar um, mudar o outro.
+ALVO_DO_CONFLITO = (
+    Despesa.referencia,
+    Despesa.fornecedor_id,
+    Despesa.natureza_id,
+    Despesa.centro_custo_id,
+    Despesa.documento,
+    func.md5(Despesa.historico),
+)
+
+# Atualizadas na reimportacao. `divergencia_ignorada` fica de fora de proposito:
+# quem marcou "nao comparar" nao pode perder isso ao reimportar.
+COLUNAS_DA_PLANILHA = (
+    "data_baixa",
+    "data_emissao",
+    "centro_custo_id",
+    "fornecedor_id",
+    "natureza_id",
+    "historico",
+    "documento",
+    "valor_original",
+    "valor_baixado",
+    "importacao_id",
+)
+
+
+def _gravar_em_lote(
+    session, linhas, *, importacao_id, centros, fornecedores, naturezas, usuario_id,
+    progresso=None,
+) -> tuple[int, int]:
+    """Upsert por `referencia`, em executemany.
+
+    A contagem sai de uma consulta previa, e nao de um RETURNING por linha:
+    devolver 180 mil linhas so para contar custava mais que a propria gravacao.
+    """
+    ja_existiam = _chaves_existentes(session, linhas)
+
+    inserir = pg_insert(Despesa)
+    comando = inserir.on_conflict_do_update(
+        index_elements=ALVO_DO_CONFLITO,
+        set_={
+            **{coluna: getattr(inserir.excluded, coluna) for coluna in COLUNAS_DA_PLANILHA},
+            "criado_por_id": func.coalesce(
+                Despesa.criado_por_id, inserir.excluded.criado_por_id
+            ),
+            "atualizado_em": func.now(),
+        },
+    )
+
+    for inicio in range(0, len(linhas), LINHAS_POR_LOTE):
+        session.execute(
+            comando,
+            [
+                {
+                    "referencia": linha.referencia,
+                    "data_baixa": linha.data_baixa,
+                    "data_emissao": linha.data_emissao,
+                    "centro_custo_id": centros[linha.centro_custo.upper()].id,
+                    "fornecedor_id": fornecedores[linha.fornecedor.upper()].id,
+                    "natureza_id": naturezas[linha.natureza.upper()].id,
+                    "historico": linha.historico,
+                    "documento": linha.documento,
+                    "valor_original": linha.valor_original,
+                    "valor_baixado": linha.valor_baixado,
+                    "importacao_id": importacao_id,
+                    "criado_por_id": usuario_id,
+                }
+                for linha in linhas[inicio : inicio + LINHAS_POR_LOTE]
+            ],
+        )
+        if progresso is not None:
+            progresso(min(inicio + LINHAS_POR_LOTE, len(linhas)), len(linhas))
+
+    atualizados = sum(1 for linha in linhas if chave_natural(linha) in ja_existiam)
+    return len(linhas) - atualizados, atualizados
 
 
 def _resolver_dominio(session, linhas: list[LinhaPlanilha]) -> tuple[dict, dict, dict]:
@@ -180,9 +242,40 @@ def _centros_inexistentes(session, codigos: set[str]) -> list[str]:
     return sorted(codigo for codigo in codigos if codigo not in ja_tem)
 
 
-def _referencias_existentes(session, referencias: list[int]) -> set[int]:
+# O PostgreSQL aceita no maximo 65535 parametros por comando, e o IN gasta um
+# por referencia. Uma planilha grande estourava isso e sujava a sessao, o que
+# aparecia como 500 varios passos adiante.
+LOTE_DE_PARAMETROS = 10_000
+
+
+def _chaves_existentes(session, linhas: list[LinhaPlanilha]) -> set[tuple]:
+    """As chaves naturais que a base ja tem, entre as referencias da planilha.
+
+    Contar so por `referencia` daria numero errado: a mesma referencia com outro
+    fornecedor e lancamento novo, nao atualizacao.
+    """
+    referencias = sorted({linha.referencia for linha in linhas})
     if not referencias:
         return set()
-    return set(
-        session.scalars(select(Despesa.referencia).where(Despesa.referencia.in_(referencias)))
+
+    consulta = (
+        select(
+            Despesa.referencia,
+            func.upper(Fornecedor.nome),
+            func.upper(Natureza.nome),
+            CentroCusto.codigo,
+            Despesa.documento,
+            Despesa.historico,
+        )
+        .join(Fornecedor, Despesa.fornecedor_id == Fornecedor.id)
+        .join(Natureza, Despesa.natureza_id == Natureza.id)
+        .join(CentroCusto, Despesa.centro_custo_id == CentroCusto.id)
     )
+
+    achadas: set[tuple] = set()
+    for inicio in range(0, len(referencias), LOTE_DE_PARAMETROS):
+        fatia = referencias[inicio : inicio + LOTE_DE_PARAMETROS]
+        achadas.update(
+            tuple(linha) for linha in session.execute(consulta.where(Despesa.referencia.in_(fatia)))
+        )
+    return achadas

@@ -138,34 +138,55 @@ def ler(origem) -> Resultado:
 
         _ler_linha(numero, celulas, mapa, resultado)
 
-    _rejeitar_referencias_repetidas(resultado)
+    _rejeitar_lancamentos_repetidos(resultado)
     return resultado
 
 
-def _rejeitar_referencias_repetidas(resultado: Resultado) -> None:
-    """REFERENCIA e unica no banco: duas linhas com a mesma quebrariam a
-    gravacao inteira no commit, e o erro sairia como 500."""
-    vistas: dict[int, int] = {}
-    repetidas: set[int] = set()
+def chave_natural(linha: LinhaPlanilha) -> tuple:
+    """O que o banco considera o mesmo lancamento.
+
+    Fornecedor e natureza sem caixa, como o `obter_ou_criar` casa; centro,
+    documento e historico exatos, como o indice compara.
+    """
+    return (
+        linha.referencia,
+        linha.fornecedor.upper(),
+        linha.natureza.upper(),
+        linha.centro_custo,
+        linha.documento,
+        linha.historico,
+    )
+
+
+def _rejeitar_lancamentos_repetidos(resultado: Resultado) -> None:
+    """A mesma referencia pode repetir; ela junto do resto, nao.
+
+    Duas linhas identicas na chave natural quebrariam a gravacao inteira no
+    commit, e o erro chegaria ao usuario como 500.
+    """
+    vistas: dict[tuple, int] = {}
+    repetidas: set[tuple] = set()
     for linha in resultado.linhas:
-        if linha.referencia in vistas:
-            repetidas.add(linha.referencia)
+        chave = chave_natural(linha)
+        if chave in vistas:
+            repetidas.add(chave)
             resultado.erros.append(
                 ErroLinha(
                     linha=linha.linha,
                     campo="REFERENCIA",
                     mensagem=(
-                        f"referência {linha.referencia} repetida "
-                        f"(já apareceu na linha {vistas[linha.referencia]})"
+                        f"lançamento repetido: referência {linha.referencia} com o mesmo "
+                        f"fornecedor, natureza, centro de custo, documento e histórico "
+                        f"da linha {vistas[chave]}"
                     ),
                 )
             )
         else:
-            vistas[linha.referencia] = linha.linha
+            vistas[chave] = linha.linha
 
     if repetidas:
         resultado.linhas = [
-            linha for linha in resultado.linhas if linha.referencia not in repetidas
+            linha for linha in resultado.linhas if chave_natural(linha) not in repetidas
         ]
 
 

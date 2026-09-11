@@ -73,6 +73,12 @@ def previa():
         destino.unlink(missing_ok=True)
         flash(str(erro), "erro")
         return redirect(url_for("importacao.enviar"))
+    except SQLAlchemyError:
+        db.session.rollback()
+        destino.unlink(missing_ok=True)
+        current_app.logger.exception("previa da importacao falhou")
+        flash("Não consegui ler essa planilha contra o banco. Tente de novo.", "erro")
+        return redirect(url_for("importacao.enviar"))
 
     session[CHAVE_ARQUIVO] = {"caminho": str(destino), "nome": arquivo.filename}
     return render_template("importacao/previa.html", secao="importacao", previa=resultado)
