@@ -268,7 +268,7 @@ ORDENS_DA_NATUREZA = {
 }
 
 
-ANOS_NO_GRAFICO = 6
+ANOS_NO_GRAFICO = 12
 
 
 def _recorte_do_grafico(args, filtro, ver: str):

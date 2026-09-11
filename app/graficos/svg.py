@@ -39,11 +39,12 @@ def barras_horizontais(
     largura: int = 620,
     maximo: int = MAXIMO_CATEGORIAS,
 ) -> Markup:
-    """Barras horizontais, da maior para a menor.
+    """Barras horizontais, na ordem em que os dados chegam.
 
     Horizontal porque os nomes sao longos ("SERVICOS ESPECIALIZADOS MEI").
+    Quem ordena e a consulta: ordenar aqui ignoraria a escolha do usuario.
     """
-    itens = _dobrar_cauda(sorted(dados, key=lambda par: par[1], reverse=True), maximo)
+    itens = _dobrar_cauda(list(dados), maximo)
     if not itens:
         return _sem_dados()
 
@@ -172,9 +173,19 @@ def _encurtar(rotulo: str) -> str:
 
 def _dobrar_cauda(itens: list[tuple[str, Decimal]], maximo: int) -> list[tuple[str, Decimal]]:
     """Alem do teto a cauda vira "Outras (n)": mais barras minusculas nao
-    resolvem categorias demais."""
+    resolvem categorias demais.
+
+    Dobra sempre as MENORES, seja qual for a ordem de exibicao — numa lista
+    alfabetica, cortar pelo fim esconderia justamente as maiores do fim.
+    """
     if maximo <= 0 or len(itens) <= maximo:
         return itens
-    cabeca, cauda = itens[: maximo - 1], itens[maximo - 1 :]
+
+    maiores = {
+        rotulo
+        for rotulo, _ in sorted(itens, key=lambda par: par[1], reverse=True)[: maximo - 1]
+    }
+    cabeca = [par for par in itens if par[0] in maiores]
+    cauda = [par for par in itens if par[0] not in maiores]
     soma = sum((valor for _, valor in cauda), Decimal(0))
     return [*cabeca, (f"Outras ({len(cauda)})", soma)]
