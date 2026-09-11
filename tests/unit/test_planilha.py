@@ -472,3 +472,76 @@ def test_texto_com_ponto_de_milhar_sem_decimais(texto, esperado):
 
 def test_espaco_inquebravel_nao_derruba():
     assert normalizado("1\xa0234,56") == "1234.56"
+
+
+# --- a chave natural --------------------------------------------------------
+#
+# A referência sozinha repete: o ERP a reaproveita. O que não pode repetir é
+# ela junto de fornecedor, natureza, centro de custo, documento e histórico.
+
+
+BASE = [2026, 3, 9, 46059, 555000, "FORN A", "4561", "NAT A", "hist X", "DOC1", -10.0, -10.0]
+POSICAO = {"fornecedor": 5, "centro": 6, "natureza": 7, "historico": 8, "documento": 9}
+
+
+def com(**mudanca):
+    linha = list(BASE)
+    for campo, valor in mudanca.items():
+        linha[POSICAO[campo]] = valor
+    return linha
+
+
+def planilha_das(linhas):
+    from io import BytesIO
+
+    from openpyxl import Workbook
+
+    livro = Workbook()
+    aba = livro.active
+    aba.append([])
+    aba.append(
+        ["ANO_BAIXA", "MES_BAIXA", "DIA_BAIXA", "DATAEMISSAO", "REFERENCIA", "FORNECEDOR",
+         "CR_REDUZIDO", "NATUREZA", "HISTORICO", "DOCUMENTO", "VALOR ORIGINAL", "VALOR BAIXADO"]
+    )
+    for linha in linhas:
+        aba.append(linha)
+    buffer = BytesIO()
+    livro.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+@pytest.mark.parametrize(
+    "campo,valor",
+    [
+        ("fornecedor", "FORN B"),
+        ("natureza", "NAT B"),
+        ("centro", "9999"),
+        ("documento", "DOC2"),
+        ("historico", "hist Y"),
+    ],
+)
+def test_mesma_referencia_com_um_campo_diferente_passa(campo, valor):
+    resultado = ler(planilha_das([BASE, com(**{campo: valor})]))
+    assert resultado.erros == []
+    assert len(resultado.linhas) == 2
+
+
+def test_tudo_igual_alerta():
+    resultado = ler(planilha_das([BASE, list(BASE)]))
+    assert len(resultado.erros) == 1
+    assert "lançamento repetido" in resultado.erros[0].mensagem
+    assert "555000" in resultado.erros[0].mensagem
+
+
+def test_tudo_igual_descarta_as_duas_copias():
+    """Elas podem ter valores diferentes, e não dá para adivinhar qual vale."""
+    resultado = ler(planilha_das([BASE, list(BASE)]))
+    assert resultado.linhas == []
+
+
+def test_fornecedor_so_muda_de_caixa_nao_e_lancamento_novo():
+    """O obter_ou_criar casa sem caixa, então o banco veria a mesma linha."""
+    resultado = ler(planilha_das([BASE, com(fornecedor="forn a")]))
+    assert len(resultado.erros) == 1
+    assert resultado.linhas == []

@@ -111,10 +111,17 @@ def test_divergente_nao_e_coluna_da_tabela(db):
 # --- chave natural e integridade -------------------------------------------
 
 
-def test_referencia_e_unica(db):
+def test_referencia_sozinha_pode_repetir(db):
+    """O ERP reaproveita a referência entre lançamentos distintos."""
+    criar_despesa(db, referencia=100)
+    criar_despesa(db, referencia=100, fornecedor="OUTRO FORNECEDOR")
+    assert True  # sem IntegrityError
+
+
+def test_referencia_com_o_resto_igual_e_recusada(db):
     criar_despesa(db, referencia=100)
     with pytest.raises(IntegrityError):
-        criar_despesa(db, referencia=100, fornecedor="OUTRO")
+        criar_despesa(db, referencia=100)
 
 
 def test_valor_negativo_e_recusado(db):

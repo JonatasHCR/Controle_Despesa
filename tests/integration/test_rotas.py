@@ -202,8 +202,37 @@ def test_valores_diferentes_marcam_divergencia(entrar, operador, db):
     assert despesa.divergente is True
 
 
-def test_referencia_repetida_e_recusada(entrar, operador, db, carregado):
-    resposta = entrar(operador).post("/despesas/nova", data=formulario(referencia="136914"))
+def test_referencia_repetida_com_fornecedor_diferente_passa(entrar, operador, db, carregado):
+    """Mesma referência, outro fornecedor: é outro lançamento."""
+    resposta = entrar(operador).post(
+        "/despesas/nova",
+        data=formulario(referencia="136914", fornecedor="FORNECEDOR INEDITO"),
+        follow_redirects=True,
+    )
+    assert resposta.status_code == 200
+    assert (
+        db.session.scalars(
+            select(Despesa).where(Despesa.referencia == 136914)
+        ).all().__len__()
+        == 2
+    )
+
+
+def test_lancamento_identico_e_recusado(entrar, operador, db, carregado):
+    existente = db.session.scalars(
+        select(Despesa).where(Despesa.referencia == 136914)
+    ).one()
+    resposta = entrar(operador).post(
+        "/despesas/nova",
+        data=formulario(
+            referencia="136914",
+            fornecedor=existente.fornecedor.nome,
+            natureza=existente.natureza.nome,
+            centro_custo=existente.centro_custo.codigo,
+            documento=existente.documento,
+            historico=existente.historico,
+        ),
+    )
     assert resposta.status_code == 400
     assert "Já existe" in resposta.get_data(as_text=True)
 

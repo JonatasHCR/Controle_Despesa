@@ -210,3 +210,84 @@ def test_arquivo_invalido_nao_deixa_rastro(db):
     with pytest.raises(ValueError, match="não parece uma planilha"):
         analisar(db.session, BytesIO(b"nada disso"), arquivo_nome="ruim.xlsx")
     assert db.session.scalar(select(func.count()).select_from(Importacao)) == 0
+
+
+# --- planilha grande --------------------------------------------------------
+#
+# O IN gasta um parâmetro por referência, e o PostgreSQL para em 65535. Uma
+# planilha grande estourava isso, sujava a sessão, e o erro saía como 500
+# vários passos adiante (PendingRollbackError).
+
+
+def planilha_de(quantidade: int, base: int):
+    from io import BytesIO
+
+    from openpyxl import Workbook
+
+    livro = Workbook()
+    aba = livro.active
+    aba.append([])
+    aba.append(
+        ["ANO_BAIXA", "MES_BAIXA", "DIA_BAIXA", "DATAEMISSAO", "REFERENCIA",
+         "FORNECEDOR", "CR_REDUZIDO", "NATUREZA", "HISTORICO", "DOCUMENTO",
+         "VALOR ORIGINAL", "VALOR BAIXADO"]
+    )
+    for posicao in range(quantidade):
+        aba.append(
+            [2026, (posicao % 12) + 1, (posicao % 28) + 1, 46059, base + posicao,
+             f"FORN {posicao % 20}", "4561", f"NAT {posicao % 5}",
+             f"hist {posicao}", f"D{posicao}", -10.0, -10.0]
+        )
+    buffer = BytesIO()
+    livro.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def test_fatia_o_in_por_referencia(db):
+    """Com mais referências que o teto de parâmetros, uma consulta só falharia."""
+    from app.importacao.planilha import ler
+    from app.importacao.servico import LOTE_DE_PARAMETROS, _chaves_existentes
+
+    assert LOTE_DE_PARAMETROS < 65535
+    # Não precisa de 65 mil linhas para exercitar o fatiamento: basta pedir mais
+    # referências do que cabe num lote.
+    linhas = ler(planilha_de(LOTE_DE_PARAMETROS * 2 + 7, 50_000_000)).linhas
+    assert _chaves_existentes(db.session, linhas) == set()
+
+
+def test_importa_mais_de_um_lote_de_uma_vez(db):
+    from app.importacao.servico import LOTE_DE_PARAMETROS, analisar, gravar
+
+    quantidade = LOTE_DE_PARAMETROS + 50
+    previa = analisar(db.session, planilha_de(quantidade, 4_000_000), arquivo_nome="g.xlsx")
+    importacao = gravar(db.session, previa, usuario=None)
+    assert importacao.criados == quantidade
+
+
+def test_reimportar_o_grande_atualiza_sem_duplicar(db):
+    from app.importacao.servico import LOTE_DE_PARAMETROS, analisar, gravar
+
+    quantidade = LOTE_DE_PARAMETROS + 50
+    for _ in range(2):
+        previa = analisar(db.session, planilha_de(quantidade, 6_000_000), arquivo_nome="g.xlsx")
+        importacao = gravar(db.session, previa, usuario=None)
+
+    assert importacao.criados == 0
+    assert importacao.atualizados == quantidade
+
+
+def test_progresso_e_chamado_por_lote(db):
+    """Sem isso o comando fica minutos mudo numa planilha grande."""
+    from app.importacao.servico import LOTE_DE_PARAMETROS, analisar, gravar
+
+    quantidade = 100
+    previa = analisar(db.session, planilha_de(quantidade, 7_000_000), arquivo_nome="p.xlsx")
+
+    chamadas = []
+    gravar(db.session, previa, usuario=None, progresso=lambda feitas, total: chamadas.append((feitas, total)))
+
+    assert chamadas, "o callback não foi chamado"
+    assert chamadas[-1] == (quantidade, quantidade)
+    assert all(total == quantidade for _, total in chamadas)
+    assert LOTE_DE_PARAMETROS  # sanidade do import
