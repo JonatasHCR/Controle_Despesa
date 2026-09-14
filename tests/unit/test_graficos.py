@@ -83,10 +83,25 @@ def test_vermelho_da_marca_nao_entra_nos_dados():
 # --- ordem ------------------------------------------------------------------
 
 
-def test_barras_saem_ordenadas_da_maior_para_a_menor():
-    raiz = arvore(barras_horizontais(list(reversed(POR_NATUREZA))))
+def test_barras_respeitam_a_ordem_recebida():
+    """Quem ordena é a consulta: o usuário escolhe maior, menor ou alfabética,
+    e o gráfico reordenando por conta própria anulava a escolha."""
+    invertida = list(reversed(POR_NATUREZA))
+    raiz = arvore(barras_horizontais(invertida))
     larguras = [float(r.get("width")) for r in retangulos(raiz)]
-    assert larguras == sorted(larguras, reverse=True)
+    assert larguras == sorted(larguras), "reordenou por conta própria"
+
+
+def test_cauda_dobrada_leva_sempre_as_menores():
+    """Numa lista alfabética, cortar pelo fim esconderia as maiores do fim."""
+    from decimal import Decimal
+
+    dados = [(letra, Decimal(valor)) for letra, valor in
+             [("A", 1), ("B", 2), ("C", 3), ("D", 4), ("E", 500)]]
+    raiz = arvore(barras_horizontais(dados, maximo=3))
+    rotulos = [t.text for t in raiz.iter(SVG + "text") if t.get("class") != "valor"]
+    assert "E" in rotulos, "dobrou a maior por estar no fim"
+    assert any(r and r.startswith("Outras") for r in rotulos)
 
 
 def test_colunas_preservam_a_ordem_cronologica():

@@ -206,8 +206,8 @@ def test_descricao_com_valor():
 # --- retrato e campos completos ---------------------------------------------
 
 
-def test_pdf_sai_em_retrato(app, carregado):
-    """A4 retrato: 210x297mm, ou 794x1123 px CSS."""
+def test_pdf_sai_em_paisagem(app, carregado):
+    """A4 paisagem: 297x210mm. Foi o que permitiu encaixar o histórico."""
     from sqlalchemy import select
 
     from app.despesas.filtros import aplicar, totais
@@ -222,9 +222,9 @@ def test_pdf_sai_em_retrato(app, carregado):
             descricao_do_filtro="",
         )
     pagina = documento.pages[0]
-    assert pagina.height > pagina.width, "saiu em paisagem"
-    assert abs(pagina.width - 794) < 4
-    assert abs(pagina.height - 1123) < 4
+    assert pagina.width > pagina.height, "saiu em retrato"
+    assert abs(pagina.width - 1123) < 4
+    assert abs(pagina.height - 794) < 4
 
 
 def test_pdf_repete_o_cabecalho_em_todas_as_paginas(app, carregado):
@@ -388,10 +388,10 @@ def test_pdf_abre_com_a_marca_da_ufc(app, carregado):
 
 
 def test_pdf_e_a4_de_verdade(app, carregado):
-    """O teste de orientação só via altura > largura: uma folha de 280mm passava."""
+    """O teste de orientação só via largura vs altura: uma folha de 280mm passava."""
     pagina = documento_do_pdf(app, carregado, quantas=5).pages[0]
-    assert round(pagina.width / MM_CSS) == 210
-    assert round(pagina.height / MM_CSS) == 297
+    assert round(pagina.width / MM_CSS) == 297
+    assert round(pagina.height / MM_CSS) == 210
 
 
 def test_nada_passa_da_margem_direita(app, carregado):

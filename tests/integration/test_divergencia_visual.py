@@ -90,10 +90,11 @@ def test_pdf_marca_as_quatro_linhas_divergentes(app, carregado):
     assert html.count("divergente") >= 4
 
 
-def test_pdf_marca_a_linha_do_historico_junto(app, carregado):
-    """O registro tem duas linhas; destacar só a de cima parte o bloco ao meio."""
+def test_pdf_tem_o_historico_na_mesma_linha(app, carregado):
+    """Em paisagem o histórico virou coluna: não há mais segunda linha."""
     html = html_do_pdf(app, carregado)
-    assert 'class="historico divergente"' in html
+    assert 'class="c-hist"' in html
+    assert 'class="historico' not in html
 
 
 def test_pdf_explica_o_simbolo_no_rodape(app, carregado):
