@@ -62,11 +62,6 @@
 
   <h2>Lançamentos</h2>
 
-  {#
-    Em retrato as dez colunas nao cabem numa linha so. O historico — o unico
-    campo de tamanho imprevisivel — desce para uma segunda linha do registro,
-    que ocupa a largura toda. Nenhum campo se perde, e nada fica espremido.
-  #}
   <table class="lancamentos">
     <thead>
       <tr>
@@ -77,14 +72,14 @@
         <th class="c-doc">Documento</th>
         <th class="c-forn">Fornecedor</th>
         <th class="c-nat">Natureza</th>
+        <th class="c-hist">Histórico</th>
         <th class="c-valor numero">Original</th>
         <th class="c-valor numero">Baixado</th>
       </tr>
     </thead>
     <tbody>
       {% for despesa in despesas %}
-        <tr class="registro {% if not despesa.historico %}sozinho{% endif %}
-                   {% if despesa.divergente %}divergente{% endif %}">
+        <tr class="registro {% if despesa.divergente %}divergente{% endif %}">
           <td>{{ despesa.data_baixa | data }}</td>
           <td>{{ despesa.data_emissao | data }}</td>
           <td>{{ despesa.referencia }}</td>
@@ -92,19 +87,15 @@
           <td>{{ despesa.documento }}</td>
           <td>{{ despesa.fornecedor.nome }}</td>
           <td>{{ despesa.natureza.nome }}</td>
+          <td class="c-hist">{{ despesa.historico }}</td>
           <td class="numero">
             {% if despesa.divergente %}<span class="marca-div">⚠</span> {% endif %}{{ despesa.valor_original | moeda }}
           </td>
           <td class="numero">{{ despesa.valor_baixado | moeda }}</td>
         </tr>
-        {% if despesa.historico %}
-          <tr class="historico {% if despesa.divergente %}divergente{% endif %}">
-            <td colspan="9"><span class="etiqueta">Histórico</span> {{ despesa.historico }}</td>
-          </tr>
-        {% endif %}
       {% endfor %}
       <tr class="total-geral">
-        <td colspan="7">Total — {{ resumo.lancamentos | numero }} lançamento{{ 's' if resumo.lancamentos != 1 }}</td>
+        <td colspan="8">Total — {{ resumo.lancamentos | numero }} lançamento{{ 's' if resumo.lancamentos != 1 }}</td>
         <td class="numero">{{ resumo.total_original | moeda }}</td>
         <td class="numero">{{ resumo.total_baixado | moeda }}</td>
       </tr>

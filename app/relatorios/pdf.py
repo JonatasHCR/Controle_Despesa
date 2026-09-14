@@ -73,11 +73,11 @@ def montar(despesas, resumo, *, descricao_do_filtro: str, grupos=None, titulo_do
     )
 
 
-# Retrato. As larguras somam a area util da A4 (210mm menos 2x12mm de margem);
-# o historico nao entra nesta conta porque ocupa uma linha propria.
+# Paisagem: os 273mm uteis (297mm menos 2x12mm) cabem as dez colunas com o
+# historico na mesma linha, sem a segunda linha por registro.
 _PAGINA = """
 @page {
-    size: A4 portrait;
+    size: A4 landscape;
     margin: 14mm 12mm 16mm;
     @bottom-center {
         content: "Controle de Despesa · página " counter(page) " de " counter(pages);
@@ -125,39 +125,22 @@ th { font-size: 6.5pt; }
 .lancamentos { table-layout: fixed; }
 .c-data  { width: 16mm; }
 .c-ref   { width: 13mm; }
-.c-cc    { width: 9mm; }
+.c-cc    { width: 10mm; }
 .c-doc   { width: 20mm; }
-.c-forn  { width: 37mm; }
-.c-nat   { width: 30mm; }
+.c-forn  { width: 40mm; }
+.c-nat   { width: 32mm; }
+.c-hist  { width: 78mm; }
 .c-valor { width: 24mm; }
 
 .lancamentos td { white-space: normal; word-wrap: break-word; }
 
-/* O registro e suas duas linhas nao se separam entre paginas. */
-tr.registro td { border-bottom: none; }
-tr.registro.sozinho td { border-bottom: 0.4pt solid #e4e5e8; }
-tr.historico td {
-    font-size: 7pt;
-    color: #52514e;
-    padding-top: 0;
-    padding-bottom: 2mm;
-    border-bottom: 0.4pt solid #e4e5e8;
-}
-tr.historico .etiqueta {
-    font-size: 6pt;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #9a9ea6;
-    margin-right: 1.5mm;
-}
+tr.registro td { border-bottom: 0.4pt solid #e4e5e8; }
+.lancamentos .c-hist { font-size: 7pt; color: #52514e; }
 
 /* Divergencia: a linha inteira em ambar, para saltar na folha impressa.
    A cor nunca vem sozinha — o simbolo e a nota de rodape explicam. */
-tr.registro.divergente td,
-tr.historico.divergente td { background: #fef6e7; }
-
+tr.registro.divergente td { background: #fef6e7; }
 tr.registro.divergente td:first-child { border-left: 2pt solid #92400e; }
-tr.historico.divergente td:first-child { border-left: 2pt solid #92400e; }
 
 tr.registro.divergente td.numero { color: #92400e; font-weight: 700; }
 
