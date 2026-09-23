@@ -25,8 +25,15 @@ if ((Read-Host 'Digite RESTAURAR para confirmar') -cne 'RESTAURAR') {
     return
 }
 
-Get-Content -Raw $caminho | docker compose exec -T db psql `
+# Copia o arquivo em bytes: o pipe do PowerShell para o psql reencoda em ASCII
+# e troca todo acento por "?".
+docker compose cp $caminho db:/tmp/restore.sql
+if ($LASTEXITCODE -ne 0) { throw 'falha copiando o backup para o container' }
+docker compose exec -T db psql `
     --set ON_ERROR_STOP=1 --single-transaction `
-    -U $env:POSTGRES_USER -d $env:POSTGRES_DB
+    -U $env:POSTGRES_USER -d $env:POSTGRES_DB -f /tmp/restore.sql
+$codigo = $LASTEXITCODE
+docker compose exec -T db rm -f /tmp/restore.sql | Out-Null
+if ($codigo -ne 0) { throw "restore falhou (codigo $codigo)" }
 
 Write-Host 'Restaurado.' -ForegroundColor Green
