@@ -111,6 +111,33 @@
   // O marcado na página 1 não está no DOM da 10: os ids ficam no sessionStorage.
 
   var CHAVE = 'despesas-selecionadas';
+  // Situação (div, aceita, ok) e valor de cada marcada: a linha de outra página
+  // não está no DOM, e a barra precisa dizer quantas mudam e quanto somam.
+  var CHAVE_ESTADO = 'despesas-selecionadas-estado';
+  var moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  function registro(caixa) {
+    return {
+      e: caixa.getAttribute('data-estado') || 'ok',
+      v: parseFloat(caixa.getAttribute('data-valor')) || 0,
+    };
+  }
+
+  function estados() {
+    try {
+      return JSON.parse(window.sessionStorage.getItem(CHAVE_ESTADO)) || {};
+    } catch (erro) {
+      return {};
+    }
+  }
+
+  function guardarEstados(mapa) {
+    try {
+      window.sessionStorage.setItem(CHAVE_ESTADO, JSON.stringify(mapa));
+    } catch (erro) {
+      /* storage bloqueado */
+    }
+  }
 
   function lidas() {
     try {
@@ -141,6 +168,19 @@
     if (contador) contador.textContent = ids.length;
     faixa.hidden = ids.length === 0;
 
+    var mapa = estados();
+    Array.prototype.forEach.call(faixa.querySelectorAll('[data-acao-lote]'), function (botao) {
+      var alvo = botao.getAttribute('data-acao-lote');
+      var quantas = ids.filter(function (id) { return mapa[id] && mapa[id].e === alvo; }).length;
+      botao.querySelector('[data-quantas]').textContent = '(' + quantas + ')';
+      botao.disabled = quantas === 0;
+    });
+
+    var total = ids.reduce(function (soma, id) { return soma + (mapa[id] ? mapa[id].v : 0); }, 0);
+    var valor = faixa.querySelector('[data-valor-selecao]');
+    if (valor) valor.textContent = moeda.format(total);
+    faixa.setAttribute('data-resumo', ids.length + ' lançamento(s), ' + moeda.format(total));
+
     var nesta = faixa.querySelector('[data-nesta-pagina]');
     if (nesta) {
       var visiveis = document.querySelectorAll('[data-selecionavel]').length;
@@ -153,10 +193,15 @@
 
   function restaurar() {
     var ids = lidas();
+    var mapa = estados();
     Array.prototype.forEach.call(
       document.querySelectorAll('[data-selecionavel]'),
-      function (caixa) { caixa.checked = ids.indexOf(caixa.value) !== -1; }
+      function (caixa) {
+        caixa.checked = ids.indexOf(caixa.value) !== -1;
+        if (caixa.checked) mapa[caixa.value] = registro(caixa);
+      }
     );
+    guardarEstados(mapa);
     pintar();
   }
 
@@ -164,10 +209,14 @@
     var caixa = evento.target.closest('[data-selecionavel]');
     if (caixa) {
       var ids = lidas();
+      var mapa = estados();
       var posicao = ids.indexOf(caixa.value);
       if (caixa.checked && posicao === -1) ids.push(caixa.value);
       if (!caixa.checked && posicao !== -1) ids.splice(posicao, 1);
+      if (caixa.checked) mapa[caixa.value] = registro(caixa);
+      else delete mapa[caixa.value];
       guardar(ids);
+      guardarEstados(mapa);
       pintar();
       return;
     }
@@ -188,13 +237,44 @@
     if (!evento.target.closest('[data-limpar-selecao]')) return;
     evento.preventDefault();
     guardar([]);
+    guardarEstados({});
     restaurar();
+  });
+
+  // Exportar a seleção: a mesma janela de exportação, com os ids na URL.
+  document.addEventListener('click', function (evento) {
+    var botao = evento.target.closest('[data-exportar-selecao]');
+    if (!botao) return;
+    var ids = lidas();
+    if (!ids.length) return;
+    var faixa = barra();
+    var link = document.createElement('a');
+    link.href = botao.getAttribute('data-url') + '?' + ids.map(function (id) {
+      return 'id=' + encodeURIComponent(id);
+    }).join('&');
+    link.setAttribute('data-exportar', 'Excel');
+    link.setAttribute('data-filtro', ids.length + ' lançamento(s) selecionado(s)');
+    link.setAttribute('data-linhas', faixa ? faixa.getAttribute('data-resumo') : '');
+    link.hidden = true;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   });
 
   // Sem isto o lote agiria só sobre o que está visível.
   document.addEventListener('submit', function (evento) {
     var formulario = evento.target.closest('[data-forma-lote]');
     if (!formulario) return;
+
+    var botao = evento.submitter;
+    if (botao && botao.hasAttribute('data-excluir-lote')) {
+      var faixa = barra();
+      var resumo = faixa ? faixa.getAttribute('data-resumo') : '';
+      if (!window.confirm('Excluir ' + resumo + '? A exclusão fica registrada na auditoria.')) {
+        evento.preventDefault();
+        return;
+      }
+    }
 
     Array.prototype.forEach.call(
       formulario.querySelectorAll('[data-id-de-outra-pagina]'),
@@ -218,8 +298,43 @@
     });
 
     guardar([]);
+    guardarEstados({});
   });
 
   document.addEventListener('DOMContentLoaded', restaurar);
   document.body.addEventListener('htmx:afterSwap', restaurar);
+})();
+
+// Importação: a planilha pode ser arrastada para a área do arquivo.
+(function () {
+  'use strict';
+
+  function nome(area, input) {
+    var alvo = area.querySelector('[data-nome-arquivo]');
+    if (alvo) alvo.textContent = input.files.length ? input.files[0].name : 'Nenhum arquivo escolhido';
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-area-arquivo]'), function (area) {
+      var input = area.querySelector('input[type=file]');
+      input.addEventListener('change', function () { nome(area, input); });
+      ['dragenter', 'dragover'].forEach(function (tipo) {
+        area.addEventListener(tipo, function (evento) {
+          evento.preventDefault();
+          area.classList.add('sobre');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function (tipo) {
+        area.addEventListener(tipo, function (evento) {
+          evento.preventDefault();
+          area.classList.remove('sobre');
+        });
+      });
+      area.addEventListener('drop', function (evento) {
+        if (!evento.dataTransfer.files.length) return;
+        input.files = evento.dataTransfer.files;
+        nome(area, input);
+      });
+    });
+  });
 })();

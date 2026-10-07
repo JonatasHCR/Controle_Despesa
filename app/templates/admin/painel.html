@@ -93,34 +93,73 @@
 
     <form method="post" action="{{ url_for('admin.limpeza') }}">
       {{ form_csrf() }}
+      {% from 'despesas/_multi.html' import campo_multi %}
       <div class="filtros">
-        <div class="campo">
-          <label for="alvo">O que apagar</label>
-          <select id="alvo" name="alvo">
-            {% for chave, rotulo in alvos.items() %}
-              <option value="{{ chave }}">{{ rotulo }}</option>
-            {% endfor %}
-          </select>
+        <div class="filtros-linha">
+          <div class="campo campo-medio">
+            <label for="alvo">O que apagar</label>
+            <select id="alvo" name="alvo" data-alvo-limpeza>
+              {% for chave, rotulo in alvos.items() %}
+                <option value="{{ chave }}">{{ rotulo }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
-        <div class="campo">
-          <label for="inicio">Baixa de</label>
-          <input type="date" id="inicio" name="inicio">
+
+        {# Só valem para despesas; os outros alvos apagam tudo do tipo. #}
+        <div class="filtros-linha" data-so-despesas>
+          <div class="campo campo-data">
+            <label for="campo_data">Data</label>
+            <select id="campo_data" name="campo_data">
+              <option value="data_baixa">Baixa</option>
+              <option value="data_emissao">Emissão</option>
+            </select>
+          </div>
+          <div class="campo campo-data">
+            <label for="inicio">De</label>
+            <input type="date" id="inicio" name="inicio">
+          </div>
+          <div class="campo campo-data">
+            <label for="fim">Até</label>
+            <input type="date" id="fim" name="fim">
+          </div>
+          {{ campo_multi('centro', 'Centro de custo', 'Todos', opcoes.centros, []) }}
+          {{ campo_multi('natureza', 'Natureza', 'Todas', opcoes.naturezas, []) }}
+          {{ campo_multi('fornecedor', 'Fornecedor', 'Todos', opcoes.fornecedores, []) }}
+          <div class="campo campo-largo">
+            <label for="busca">Buscar</label>
+            <input type="search" id="busca" name="busca" autocomplete="off"
+                   placeholder="referência, histórico, documento ou fornecedor">
+          </div>
         </div>
-        <div class="campo">
-          <label for="fim">até</label>
-          <input type="date" id="fim" name="fim">
+        <div class="filtros-linha" data-so-despesas>
+          <div class="campo campo-curto">
+            <label for="documento">Documento</label>
+            <input type="search" id="documento" name="documento" autocomplete="off">
+          </div>
+          <div class="campo campo-curto">
+            <label for="referencia">Referência</label>
+            <input type="search" id="referencia" name="referencia" inputmode="numeric"
+                   placeholder="inteira ou parte" autocomplete="off">
+          </div>
+          <div class="campo campo-curto">
+            <label for="valor_minimo">Valor de</label>
+            <input type="text" id="valor_minimo" name="valor_minimo" inputmode="decimal" placeholder="0,00">
+          </div>
+          <div class="campo campo-curto">
+            <label for="valor_maximo">Valor até</label>
+            <input type="text" id="valor_maximo" name="valor_maximo" inputmode="decimal" placeholder="0,00">
+          </div>
+          <label class="interruptor">
+            <input type="checkbox" name="divergentes" value="1"> Só divergentes
+          </label>
         </div>
-        <div class="campo">
-          <label for="centro">Centro de custo</label>
-          <select id="centro" name="centro">
-            <option value="">todos</option>
-            {% for codigo in opcoes.centros %}<option value="{{ codigo }}">{{ codigo }}</option>{% endfor %}
-          </select>
+        <div class="filtros-rodape">
+          <button type="button" class="botao"
+                  hx-post="{{ url_for('admin.contagem') }}"
+                  hx-include="closest form"
+                  hx-target="#contagem">Contar antes</button>
         </div>
-        <button type="button" class="botao"
-                hx-post="{{ url_for('admin.contagem') }}"
-                hx-include="closest form"
-                hx-target="#contagem">Contar antes</button>
       </div>
 
       <div id="contagem" class="mt-p"></div>

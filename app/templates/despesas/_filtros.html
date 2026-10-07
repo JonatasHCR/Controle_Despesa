@@ -2,6 +2,7 @@
 
    Os três campos múltiplos saem como input + datalist; o filtros.js troca cada
    um por uma lista com busca e caixas de marcar. Sem JS, o datalist funciona. #}
+{% from 'despesas/_multi.html' import campo_multi %}
 {% set campos_do_filtro = ['campo_data', 'inicio', 'fim', 'centro', 'natureza', 'fornecedor', 'busca',
                            'documento', 'referencia', 'valor_minimo', 'valor_maximo', 'divergentes',
                            'pagina'] + (['agrupar'] if agrupavel else []) %}
@@ -33,30 +34,9 @@
              {% if filtro.inicio %}min="{{ filtro.inicio.isoformat() }}"{% endif %}>
     </div>
 
-    {# Cada escolhido vira um hidden próprio: é o que `args.getlist` enxerga. #}
-    {% for campo, rotulo, vazio, lista in [
-         ('centro', 'Centro de custo', 'Todos', opcoes.centros),
-         ('natureza', 'Natureza', 'Todas', opcoes.naturezas),
-         ('fornecedor', 'Fornecedor', 'Todos', opcoes.fornecedores)] %}
-      <div class="campo campo-multi" data-multi="{{ campo }}" data-todos="{{ vazio }}">
-        <label for="{{ campo }}-busca">{{ rotulo }}</label>
-        <div class="escolhidos" data-escolhidos>
-          {% for valor in selecionados(campo) %}
-            <span class="chip-escolhido">
-              <span>{{ valor }}</span>
-              <input type="hidden" name="{{ campo }}" value="{{ valor }}">
-              <button type="button" class="tirar-escolhido" data-tirar-escolhido
-                      aria-label="Tirar {{ valor }}">×</button>
-            </span>
-          {% endfor %}
-        </div>
-        <input type="search" id="{{ campo }}-busca" list="opcoes-{{ campo }}"
-               placeholder="{{ vazio | lower }}" autocomplete="off" data-adicionar>
-        <datalist id="opcoes-{{ campo }}">
-          {% for item in lista %}<option value="{{ item }}">{% endfor %}
-        </datalist>
-      </div>
-    {% endfor %}
+    {{ campo_multi('centro', 'Centro de custo', 'Todos', opcoes.centros, selecionados('centro')) }}
+    {{ campo_multi('natureza', 'Natureza', 'Todas', opcoes.naturezas, selecionados('natureza')) }}
+    {{ campo_multi('fornecedor', 'Fornecedor', 'Todos', opcoes.fornecedores, selecionados('fornecedor')) }}
 
     <div class="campo campo-largo">
       <label for="busca">Buscar</label>

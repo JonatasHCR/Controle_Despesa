@@ -87,8 +87,9 @@ def montar():
 @limiter.limit("20 per minute")
 def baixar(formato: str):
     if formato not in TIPOS:
-        return render_template("erro.html", codigo=404, titulo="Formato desconhecido",
-                               mensagem="Use xlsx ou pdf."), 404
+        return render_template(
+            "erro.html", codigo=404, titulo="Formato desconhecido", mensagem="Use xlsx ou pdf."
+        ), 404
 
     filtro = filtro_da_query(request.args, sessao=db.session)
     por = agrupamento_da_query(request.args)
@@ -164,6 +165,8 @@ def descrever(filtro, agrupamento: str | None) -> str:
         partes.append(f"valor até {filtro.valor_maximo}")
     if filtro.somente_divergentes:
         partes.append("somente divergentes")
+    if filtro.ids:
+        partes.append(f"{len(filtro.ids)} lançamentos selecionados")
 
     texto = "Todos os lançamentos" if not partes else "Filtro: " + "; ".join(partes)
     if agrupamento:

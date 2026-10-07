@@ -65,6 +65,8 @@ class Filtro:
     valor_minimo: Decimal | None = None
     valor_maximo: Decimal | None = None
     somente_divergentes: bool = False
+    # Exportar a seleção: só estes lançamentos, além do resto do filtro.
+    ids: list[int] = field(default_factory=list)
     ordem: str = "data"
     decrescente: bool = False
 
@@ -150,9 +152,7 @@ def agrupar(session, filtro: Filtro, *, por: str, ordem: str = "maior") -> list[
     # ordem alfabetica: "01/11/2010" viria antes de "03/11/2010" mas tambem de
     # "01/12/2009". Por isso ordena pela data de verdade.
     consulta = consulta.order_by(
-        func.min(filtro.coluna_de_data).asc()
-        if cronologico
-        else ORDENS_DO_GRUPO[ordem](rotulo)
+        func.min(filtro.coluna_de_data).asc() if cronologico else ORDENS_DO_GRUPO[ordem](rotulo)
     )
 
     return [
@@ -228,9 +228,7 @@ def _condicoes(consulta: Select, filtro: Filtro) -> Select:
         # Igualdade, nao prefixo: 'SERVICOS DE ORCAMENTO' nao pode arrastar
         # 'SERVICOS DIVERSOS'.
         consulta = consulta.where(
-            Despesa.natureza_id.in_(
-                select(Natureza.id).where(Natureza.nome.in_(filtro.naturezas))
-            )
+            Despesa.natureza_id.in_(select(Natureza.id).where(Natureza.nome.in_(filtro.naturezas)))
         )
     if filtro.fornecedores:
         consulta = consulta.where(
@@ -266,6 +264,9 @@ def _condicoes(consulta: Select, filtro: Filtro) -> Select:
 
     if filtro.somente_divergentes:
         consulta = consulta.where(Despesa.divergente)
+
+    if filtro.ids:
+        consulta = consulta.where(Despesa.id.in_(filtro.ids))
 
     return consulta
 

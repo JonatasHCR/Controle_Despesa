@@ -13,10 +13,11 @@
           enctype="multipart/form-data">
       {{ form_csrf() }}
       <h2>Envie o arquivo</h2>
-      <div class="campo">
-        <label for="planilha">Planilha</label>
+      <label class="area-arquivo" for="planilha" data-area-arquivo>
+        <span class="area-titulo">Arraste a planilha aqui ou clique para escolher</span>
+        <span class="area-nome" data-nome-arquivo>Nenhum arquivo escolhido</span>
         <input type="file" id="planilha" name="planilha" accept=".xlsx" required>
-      </div>
+      </label>
       <div class="acoes mt-p">
         <button type="submit" class="botao-principal">Ver prévia</button>
       </div>

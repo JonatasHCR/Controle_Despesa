@@ -103,9 +103,7 @@ def test_operador_nao_gera_backup(entrar, operador, backups):
 
 
 def test_contagem_nao_apaga_nada(entrar, admin, carregado, db):
-    resposta = entrar(admin).post(
-        "/administracao/contagem", data={"alvo": "despesas"}
-    )
+    resposta = entrar(admin).post("/administracao/contagem", data={"alvo": "despesas"})
     assert "127" in resposta.get_data(as_text=True)
     assert db.session.scalar(select(func.count()).select_from(Despesa)) == 127
 
@@ -258,9 +256,7 @@ def test_mudanca_de_perfil_e_auditada(entrar, admin, leitor, db):
         data={"perfil": "admin"},
         follow_redirects=True,
     )
-    entrada = db.session.scalars(
-        select(Auditoria).where(Auditoria.acao == "usuario.perfil")
-    ).one()
+    entrada = db.session.scalars(select(Auditoria).where(Auditoria.acao == "usuario.perfil")).one()
     assert entrada.payload["de"] == "leitor"
     assert entrada.payload["para"] == "admin"
 
@@ -370,3 +366,45 @@ def test_nenhuma_rota_monta_html_com_f_string():
             if tag.search(linha):
                 suspeitas.append(f"{arquivo.relative_to(raiz)}:{numero}")
     assert not suspeitas, "HTML montado em f-string: " + ", ".join(suspeitas)
+
+
+def test_limpeza_tem_os_filtros_do_relatorio(entrar, admin, carregado):
+    corpo = entrar(admin).get("/administracao/").get_data(as_text=True)
+    for campo in (
+        'data-multi="natureza"',
+        'data-multi="fornecedor"',
+        'name="documento"',
+        'name="valor_minimo"',
+        'name="divergentes"',
+        'name="campo_data"',
+    ):
+        assert campo in corpo
+
+
+def test_contagem_mostra_valor_e_recorte(entrar, admin, carregado):
+    corpo = (
+        entrar(admin)
+        .post(
+            "/administracao/contagem",
+            data={"alvo": "despesas", "natureza": "COMBUSTIVEL", "divergentes": "1"},
+        )
+        .get_data(as_text=True)
+    )
+    assert "natureza COMBUSTIVEL" in corpo and "somente divergentes" in corpo
+
+
+def test_limpeza_por_fornecedor_e_valor_apaga_so_o_recorte(entrar, admin, carregado, db):
+    from sqlalchemy import func, select
+
+    from app.models import Despesa, Fornecedor
+
+    nome = db.session.scalars(select(Fornecedor.nome).order_by(Fornecedor.nome)).first()
+    do_fornecedor = db.session.scalar(
+        select(func.count(Despesa.id)).join(Despesa.fornecedor).where(Fornecedor.nome == nome)
+    )
+    antes = db.session.scalar(select(func.count(Despesa.id)))
+    entrar(admin).post(
+        "/administracao/limpeza",
+        data={"alvo": "despesas", "fornecedor": nome, "confirmacao": "LIMPAR"},
+    )
+    assert db.session.scalar(select(func.count(Despesa.id))) == antes - do_fornecedor

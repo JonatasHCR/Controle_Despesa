@@ -99,14 +99,18 @@ def gerar_backup() -> Path:
     # DROP no arquivo, que e o que permite restaurar por cima de banco povoado.
     comando = [
         "pg_dump",
-        "-h", conexao["host"],
-        "-p", conexao["porta"],
-        "-U", conexao["usuario"],
+        "-h",
+        conexao["host"],
+        "-p",
+        conexao["porta"],
+        "-U",
+        conexao["usuario"],
         "--clean",
         "--if-exists",
         "--no-owner",
         "--no-privileges",
-        "-f", str(destino),
+        "-f",
+        str(destino),
         conexao["banco"],
     ]
     resultado = _rodar(comando, conexao)
@@ -126,24 +130,37 @@ def restaurar(session, nome: str) -> str:
     if arquivo.name.endswith(".dump"):
         comando = [
             "pg_restore",
-            "-h", conexao["host"],
-            "-p", conexao["porta"],
-            "-U", conexao["usuario"],
-            "-d", conexao["banco"],
-            "--clean", "--if-exists", "--no-owner", "--no-privileges",
+            "-h",
+            conexao["host"],
+            "-p",
+            conexao["porta"],
+            "-U",
+            conexao["usuario"],
+            "-d",
+            conexao["banco"],
+            "--clean",
+            "--if-exists",
+            "--no-owner",
+            "--no-privileges",
             str(arquivo),
         ]
     else:
         _exigir_clean(arquivo)
         comando = [
             "psql",
-            "-h", conexao["host"],
-            "-p", conexao["porta"],
-            "-U", conexao["usuario"],
-            "-d", conexao["banco"],
-            "--set", "ON_ERROR_STOP=1",
+            "-h",
+            conexao["host"],
+            "-p",
+            conexao["porta"],
+            "-U",
+            conexao["usuario"],
+            "-d",
+            conexao["banco"],
+            "--set",
+            "ON_ERROR_STOP=1",
             "--single-transaction",
-            "-f", str(arquivo),
+            "-f",
+            str(arquivo),
         ]
 
     resultado = _rodar(comando, conexao)

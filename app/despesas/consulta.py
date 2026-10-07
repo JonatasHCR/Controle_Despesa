@@ -11,6 +11,8 @@ from sqlalchemy import select
 from app.despesas.filtros import AGRUPAMENTOS, ORDENS, Filtro, curinga
 from app.models import CentroCusto, Fornecedor, Natureza
 
+LIMITE_DE_IDS = 5000
+
 
 def filtro_da_query(args, *, sessao=None) -> Filtro:
     """Monta o Filtro a partir de `request.args`.
@@ -38,12 +40,11 @@ def filtro_da_query(args, *, sessao=None) -> Filtro:
         valor_minimo=_decimal(args.get("valor_minimo")),
         valor_maximo=_decimal(args.get("valor_maximo")),
         somente_divergentes=args.get("divergentes") in ("1", "true", "on"),
+        ids=[int(v) for v in args.getlist("id") if v.isdigit()][:LIMITE_DE_IDS],
         ordem=ordem if ordem in ORDENS else "data",
         # Sem `desc` na URL, o padrao e decrescente: a tela abre nas despesas
         # mais recentes, que e o que se quer ver primeiro.
-        decrescente=(
-            args["desc"] in ("1", "true", "on") if "desc" in args else True
-        ),
+        decrescente=(args["desc"] in ("1", "true", "on") if "desc" in args else True),
     )
 
 
@@ -75,7 +76,7 @@ def _resolver(sessao, modelo, coluna, termos: list[str]) -> list[str]:
 # --- chips do recorte ativo -------------------------------------------------
 
 # Nao sao filtro: agrupar muda a apresentacao, e pagina/ordem a navegacao.
-FORA_DO_RECORTE = {"agrupar", "pagina", "ordem", "desc", "campo_data"}
+FORA_DO_RECORTE = {"agrupar", "pagina", "ordem", "desc", "campo_data", "id"}
 
 MULTIPLOS = ("centro", "natureza", "fornecedor")
 
@@ -99,9 +100,7 @@ class Chip:
 def chips_do_filtro(args) -> list[Chip]:
     """O recorte ativo em uma linha, cada pedaco removivel."""
     presentes = {
-        chave: valor
-        for chave, valor in args.items()
-        if valor and chave not in FORA_DO_RECORTE
+        chave: valor for chave, valor in args.items() if valor and chave not in FORA_DO_RECORTE
     }
     lista: list[Chip] = []
 
@@ -185,8 +184,11 @@ def atalhos_de_periodo(sessao, filtro: Filtro, args) -> list[dict]:
     else:
         ano, mes = ultima.year - 1, ultima.month + 10
     lista += [
-        item(f"{mes_curto(ultima.month)}/{ultima.year}",
-             date(ultima.year, ultima.month, 1), fim_do_mes),
+        item(
+            f"{mes_curto(ultima.month)}/{ultima.year}",
+            date(ultima.year, ultima.month, 1),
+            fim_do_mes,
+        ),
         item("Últimos 3 meses", date(ano, mes, 1), fim_do_mes),
         item(str(ultima.year), date(ultima.year, 1, 1), date(ultima.year, 12, 31)),
         item(str(ultima.year - 1), date(ultima.year - 1, 1, 1), date(ultima.year - 1, 12, 31)),
@@ -236,9 +238,7 @@ def todos_os_valores(args) -> dict[str, list[str]]:
 def query_sem(args, *remover: str) -> dict:
     """Copia da query string sem certas chaves — para montar links e formularios."""
     return {
-        chave: valores
-        for chave, valores in todos_os_valores(args).items()
-        if chave not in remover
+        chave: valores for chave, valores in todos_os_valores(args).items() if chave not in remover
     }
 
 

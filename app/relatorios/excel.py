@@ -44,8 +44,8 @@ def _formatos(livro: Workbook) -> dict:
         "data": livro.add_format({"num_format": "dd/mm/yyyy"}),
         # O R$ vem do formato de celula, e nao do texto: mandar "R$ 1.234,56"
         # como string faria o Excel tratar a coluna como texto e parar de somar.
-        "moeda": livro.add_format({"num_format": 'R$ #,##0.00'}),
-        "moeda_forte": livro.add_format({"num_format": 'R$ #,##0.00', "bold": True, "top": 1}),
+        "moeda": livro.add_format({"num_format": "R$ #,##0.00"}),
+        "moeda_forte": livro.add_format({"num_format": "R$ #,##0.00", "bold": True, "top": 1}),
         "texto": livro.add_format({}),
         "forte": livro.add_format({"bold": True, "top": 1}),
         "aviso": livro.add_format({"font_color": "#92400e"}),

@@ -17,8 +17,10 @@ from app.admin import manutencao
 from app.auditoria.servico import registrar
 from app.auth.guardas import requer, usuario_atual
 from app.despesas.consulta import filtro_da_query, opcoes
+from app.despesas.filtros import totais
 from app.extensions import db, limiter
 from app.models import PERFIS, Usuario
+from app.relatorios.rotas import descrever
 
 bp = Blueprint("admin", __name__, url_prefix="/administracao")
 
@@ -84,7 +86,11 @@ def contagem():
         # o HTML. A CSP fechada impedia a execucao, mas a defesa nao pode
         # depender so dela.
         return render_template("admin/_erro.html", mensagem=str(erro)), 400
-    return render_template("admin/_contagem.html", quantidade=quantidade, alvo=alvo)
+    valor = totais(db.session, filtro).total_baixado if alvo == "despesas" else None
+    descricao = _recorte(filtro) if alvo == "despesas" else ""
+    return render_template(
+        "admin/_contagem.html", quantidade=quantidade, alvo=alvo, valor=valor, descricao=descricao
+    )
 
 
 @bp.post("/limpeza")
@@ -109,7 +115,11 @@ def limpeza():
         acao="manutencao.limpeza",
         usuario=usuario_atual(),
         alvo_tipo="limpeza",
-        payload={"alvo": alvo, "removidos": quantidade},
+        payload={
+            "alvo": alvo,
+            "removidos": quantidade,
+            "filtro": _recorte(filtro) if alvo == "despesas" else None,
+        },
     )
     db.session.commit()
     flash(f"{quantidade} registro(s) removido(s) de {alvo}.", "")
@@ -174,3 +184,8 @@ def mudar_perfil(identificador: int):
     db.session.commit()
     flash(f"{pessoa.nome} agora é {perfil}.", "")
     return redirect(url_for("admin.painel"))
+
+
+def _recorte(filtro) -> str:
+    """O filtro em uma linha, sem a data de emissão que o relatório acrescenta."""
+    return descrever(filtro, None).split(" · emitido em")[0]

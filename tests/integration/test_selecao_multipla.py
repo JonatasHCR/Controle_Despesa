@@ -21,9 +21,9 @@ def test_duas_naturezas_somam_as_duas(entrar, leitor, carregado):
     cliente = entrar(leitor)
     uma = cliente.get("/despesas?natureza=COMBUSTIVEL").get_data(as_text=True)
     outra = cliente.get("/despesas?natureza=TICKET ALIMENTAÇÃO").get_data(as_text=True)
-    juntas = cliente.get(
-        "/despesas?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO"
-    ).get_data(as_text=True)
+    juntas = cliente.get("/despesas?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO").get_data(
+        as_text=True
+    )
 
     assert uma.count('<tr class="linha-divergente"') + uma.count("<tr>") > 0
     # 5 de combustível + 4 de ticket; o que importa é a soma bater.
@@ -31,24 +31,26 @@ def test_duas_naturezas_somam_as_duas(entrar, leitor, carregado):
 
 
 def test_cada_valor_vira_um_chip_no_formulario(entrar, leitor, carregado):
-    corpo = entrar(leitor).get(
-        "/despesas?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO"
-    ).get_data(as_text=True)
+    corpo = (
+        entrar(leitor)
+        .get("/despesas?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO")
+        .get_data(as_text=True)
+    )
     assert corpo.count('class="chip-escolhido"') == 2
     assert "COMBUSTIVEL" in corpo and "TICKET ALIMENTAÇÃO" in corpo
 
 
 def test_cada_valor_vira_um_chip_removivel_no_painel(entrar, leitor, carregado):
-    corpo = entrar(leitor).get(
-        "/?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO"
-    ).get_data(as_text=True)
+    corpo = (
+        entrar(leitor)
+        .get("/?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO")
+        .get_data(as_text=True)
+    )
     assert corpo.count('class="chip"') == 2
 
 
 def test_escolhidos_voltam_como_hidden_no_formulario(entrar, leitor, carregado):
-    corpo = entrar(leitor).get(
-        "/despesas?fornecedor=LOCALIZA RENT A CAR SA"
-    ).get_data(as_text=True)
+    corpo = entrar(leitor).get("/despesas?fornecedor=LOCALIZA RENT A CAR SA").get_data(as_text=True)
     assert 'type="hidden" name="fornecedor" value="LOCALIZA RENT A CAR SA"' in corpo
 
 
@@ -59,9 +61,11 @@ def links_de_relatorio(corpo: str) -> list[tuple[str, str]]:
 
 
 def test_link_do_excel_leva_os_dois_valores(entrar, leitor, carregado):
-    corpo = entrar(leitor).get(
-        "/despesas?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO"
-    ).get_data(as_text=True)
+    corpo = (
+        entrar(leitor)
+        .get("/despesas?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO")
+        .get_data(as_text=True)
+    )
     for _, query in links_de_relatorio(corpo):
         assert query.count("natureza=") == 2
 
@@ -69,9 +73,11 @@ def test_link_do_excel_leva_os_dois_valores(entrar, leitor, carregado):
 def test_link_de_relatorio_vem_no_trecho_do_htmx(entrar, leitor, carregado):
     """O filtro troca só o #resultado. Com os botões fora dele, eles ficavam com
     o recorte de quando a página carregou — e o PDF saía com tudo."""
-    corpo = entrar(leitor).get(
-        "/despesas?natureza=COMBUSTIVEL", headers={"HX-Request": "true"}
-    ).get_data(as_text=True)
+    corpo = (
+        entrar(leitor)
+        .get("/despesas?natureza=COMBUSTIVEL", headers={"HX-Request": "true"})
+        .get_data(as_text=True)
+    )
 
     links = links_de_relatorio(corpo)
     assert {formato for formato, _ in links} == {"xlsx", "pdf"}
@@ -94,9 +100,7 @@ def test_excel_gerado_tem_so_o_recorte(entrar, leitor, carregado):
 
 
 def test_relatorio_respeita_os_dois_valores(entrar, leitor, carregado):
-    resposta = entrar(leitor).get(
-        "/relatorios/?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO"
-    )
+    resposta = entrar(leitor).get("/relatorios/?natureza=COMBUSTIVEL&natureza=TICKET ALIMENTAÇÃO")
     assert resposta.status_code == 200
     assert b"COMBUSTIVEL" in resposta.data
 
@@ -152,7 +156,7 @@ def test_lote_desmarca(entrar, operador, carregado):
 
 def test_lote_aceita_ids_de_paginas_diferentes(entrar, operador, carregado):
     """O JS manda os ids guardados; o servidor não sabe de página nenhuma."""
-    todas = list(carregado.session.scalars(select(Despesa).order_by(Despesa.id)))
+    todas = divergentes(carregado)
     alvos = [todas[0], todas[-1]]
 
     entrar(operador).post(
@@ -203,3 +207,66 @@ def test_checkbox_aparece_para_operador_e_nao_para_leitor(entrar, operador, leit
 
     do_leitor = entrar(leitor).get("/despesas").get_data(as_text=True)
     assert "data-selecionavel" not in do_leitor
+
+
+def test_aceitar_em_lote_so_mexe_em_quem_tem_diferenca(entrar, operador, carregado):
+    """ "Marcar todos" traz linhas sem diferença; elas ficam como estavam."""
+    alvo = divergentes(carregado)[0]
+    sem_diferenca = carregado.session.scalars(
+        select(Despesa).where(Despesa.valor_original == Despesa.valor_baixado)
+    ).first()
+
+    resposta = entrar(operador).post(
+        "/despesas/divergencia-em-lote",
+        data={"ids": [str(alvo.id), str(sem_diferenca.id)], "acao": "ignorar"},
+        follow_redirects=True,
+    )
+    assert carregado.session.get(Despesa, alvo.id).divergencia_ignorada is True
+    assert carregado.session.get(Despesa, sem_diferenca.id).divergencia_ignorada is False
+    corpo = resposta.get_data(as_text=True)
+    assert "1 despesa(s) tiveram a diferença aceita" in corpo
+    assert "1 selecionada(s) não tinham diferença" in corpo
+
+
+def test_checkbox_diz_a_situacao_da_linha(entrar, operador, carregado):
+    corpo = entrar(operador).get("/despesas?divergentes=1").get_data(as_text=True)
+    assert 'data-estado="div"' in corpo
+    assert 'data-acao-lote="div"' in corpo and 'data-acao-lote="aceita"' in corpo
+
+
+def test_excluir_em_lote(entrar, operador, carregado):
+    from app.models import Auditoria
+
+    alvos = divergentes(carregado)[:2]
+    ids = [d.id for d in alvos]
+    resposta = entrar(operador).post(
+        "/despesas/excluir-em-lote", data={"ids": [str(i) for i in ids]}, follow_redirects=True
+    )
+    assert "2 despesa(s) excluída(s)" in resposta.get_data(as_text=True)
+    assert all(carregado.session.get(Despesa, i) is None for i in ids)
+    entrada = carregado.session.scalars(
+        select(Auditoria).where(Auditoria.acao == "despesa.excluir")
+    ).one()
+    assert entrada.payload["quantidade"] == 2
+
+
+def test_excluir_em_lote_e_negado_ao_leitor(entrar, leitor, carregado):
+    alvo = divergentes(carregado)[0]
+    resposta = entrar(leitor).post("/despesas/excluir-em-lote", data={"ids": [str(alvo.id)]})
+    assert resposta.status_code == 403
+    assert carregado.session.get(Despesa, alvo.id) is not None
+
+
+def test_exportar_so_a_selecao(entrar, leitor, carregado):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    alvos = divergentes(carregado)[:3]
+    consulta = "&".join(f"id={d.id}" for d in alvos)
+    resposta = entrar(leitor).get(f"/relatorios/xlsx?{consulta}")
+    assert resposta.status_code == 200
+    planilha = load_workbook(BytesIO(resposta.data)).active
+    texto = " ".join(str(c.value) for linha in planilha.iter_rows() for c in linha if c.value)
+    assert "3 lançamentos selecionados" in texto
+    assert all(str(d.referencia) in texto for d in alvos)

@@ -1,0 +1,22 @@
+{# Campo de várias escolhas: input + datalist que o filtros.js troca por lista com busca.
+   Cada escolhido vira um hidden próprio, que é o que `args.getlist` enxerga. #}
+{% macro campo_multi(campo, rotulo, vazio, lista, escolhidos) %}
+  <div class="campo campo-multi" data-multi="{{ campo }}" data-todos="{{ vazio }}">
+    <label for="{{ campo }}-busca">{{ rotulo }}</label>
+    <div class="escolhidos" data-escolhidos>
+      {% for valor in escolhidos %}
+        <span class="chip-escolhido">
+          <span>{{ valor }}</span>
+          <input type="hidden" name="{{ campo }}" value="{{ valor }}">
+          <button type="button" class="tirar-escolhido" data-tirar-escolhido
+                  aria-label="Tirar {{ valor }}">×</button>
+        </span>
+      {% endfor %}
+    </div>
+    <input type="search" id="{{ campo }}-busca" list="opcoes-{{ campo }}"
+           placeholder="{{ vazio | lower }}" autocomplete="off" data-adicionar>
+    <datalist id="opcoes-{{ campo }}">
+      {% for item in lista %}<option value="{{ item }}">{% endfor %}
+    </datalist>
+  </div>
+{% endmacro %}

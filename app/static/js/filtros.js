@@ -168,7 +168,8 @@
         escolhidos.appendChild(oculto);
       });
       original = marcados.slice().sort().join('\n');
-      enviar(formulario);
+      // Fora da barra de filtros (ex.: limpeza na administração) só guarda a escolha.
+      if (formulario.hasAttribute('data-filtros')) enviar(formulario);
     }
 
     caixa._fechar = fechar;
@@ -256,5 +257,20 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     Array.prototype.forEach.call(document.querySelectorAll('[data-filtros]'), montarFiltros);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-multi]'), function (caixa) {
+      if (!caixa.closest('[data-filtros]')) montarMulti(caixa);
+    });
+
+    // Limpeza: os filtros só valem para despesas.
+    var alvo = document.querySelector('[data-alvo-limpeza]');
+    if (alvo) {
+      var alternar = function () {
+        Array.prototype.forEach.call(document.querySelectorAll('[data-so-despesas]'), function (bloco) {
+          bloco.hidden = alvo.value !== 'despesas';
+        });
+      };
+      alvo.addEventListener('change', alternar);
+      alternar();
+    }
   });
 })();

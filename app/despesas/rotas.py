@@ -75,7 +75,9 @@ def painel():
             "naturezas": filtro.naturezas,
         },
         ranking_centros=_ranking(
-            por_centro[:NO_RANKING], resumo.total_baixado, "centro",
+            por_centro[:NO_RANKING],
+            resumo.total_baixado,
+            "centro",
             lambda c: _nome_do_centro(c, nomes),
         ),
         ranking_fornecedores=_ranking(
@@ -261,18 +263,19 @@ def editar(identificador: int):
 def divergencia_em_lote():
     """Marca/desmarca varias de uma vez; a selecao atravessa as paginas."""
     ignorar = request.form.get("acao") != "comparar"
-    identificadores = {
-        int(valor) for valor in request.form.getlist("ids") if valor.isdigit()
-    }
+    identificadores = {int(valor) for valor in request.form.getlist("ids") if valor.isdigit()}
     if not identificadores:
         flash("Nenhuma despesa selecionada.", "erro")
         return _de_volta_para_a_lista()
 
-    despesas = db.session.scalars(
-        select(Despesa).where(Despesa.id.in_(identificadores))
-    ).all()
+    despesas = db.session.scalars(select(Despesa).where(Despesa.id.in_(identificadores))).all()
 
-    mudaram = [d for d in despesas if d.divergencia_ignorada != ignorar]
+    # Aceitar só vale para quem tem diferença sinalizada; voltar a comparar, só
+    # para quem estava aceita. "Marcar todos" pode trazer linhas sem diferença.
+    if ignorar:
+        mudaram = [d for d in despesas if d.divergente]
+    else:
+        mudaram = [d for d in despesas if d.divergencia_ignorada]
     for despesa in mudaram:
         despesa.divergencia_ignorada = ignorar
 
@@ -291,11 +294,51 @@ def divergencia_em_lote():
         )
     db.session.commit()
 
-    flash(
-        f"{len(mudaram)} despesa(s) "
-        + ("deixaram de sinalizar divergência." if ignorar else "voltaram a comparar os valores."),
-        "",
+    puladas = len(despesas) - len(mudaram)
+    mensagem = f"{len(mudaram)} despesa(s) " + (
+        "tiveram a diferença aceita." if ignorar else "voltaram a comparar os valores."
     )
+    if puladas:
+        mensagem += f" {puladas} selecionada(s) " + (
+            "não tinham diferença a aceitar e ficaram como estavam."
+            if ignorar
+            else "já eram comparadas e ficaram como estavam."
+        )
+    flash(mensagem, "")
+    return _de_volta_para_a_lista()
+
+
+@bp.post("/despesas/excluir-em-lote")
+@requer("operador")
+def excluir_em_lote():
+    """Exclui as selecionadas, inclusive de outras páginas. Uma entrada na auditoria."""
+    identificadores = {int(valor) for valor in request.form.getlist("ids") if valor.isdigit()}
+    despesas = (
+        db.session.scalars(select(Despesa).where(Despesa.id.in_(identificadores))).all()
+        if identificadores
+        else []
+    )
+    if not despesas:
+        flash("Nenhuma despesa selecionada.", "erro")
+        return _de_volta_para_a_lista()
+
+    total = sum((d.valor_baixado or Decimal("0") for d in despesas), Decimal("0"))
+    registrar(
+        db.session,
+        acao="despesa.excluir",
+        usuario=usuario_atual(),
+        alvo_tipo="despesa",
+        alvo_id=None,
+        payload={
+            "quantidade": len(despesas),
+            "valor_baixado": str(total),
+            "despesas": [_instantaneo(d) for d in despesas],
+        },
+    )
+    for despesa in despesas:
+        db.session.delete(despesa)
+    db.session.commit()
+    flash(f"{len(despesas)} despesa(s) excluída(s).", "")
     return _de_volta_para_a_lista()
 
 
@@ -477,8 +520,11 @@ def _preencher(despesa: Despesa, form) -> str | None:
     if valor_original is None:
         valor_original = valor_baixado
 
-    for campo, rotulo in (("centro_custo", "centro de custo"), ("fornecedor", "fornecedor"),
-                          ("natureza", "natureza")):
+    for campo, rotulo in (
+        ("centro_custo", "centro de custo"),
+        ("fornecedor", "fornecedor"),
+        ("natureza", "natureza"),
+    ):
         if not (form.get(campo) or "").strip():
             return f"Informe o {rotulo}."
 
