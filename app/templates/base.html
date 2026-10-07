@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# Sem isto o htmx injeta um <style> próprio, que a CSP bloqueia. #}
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
   <title>{% block titulo %}Controle de Despesa{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   <script src="{{ url_for('static', filename='js/tema.js') }}"></script>

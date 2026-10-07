@@ -88,7 +88,7 @@
     function pintarBotao() {
       contador.hidden = marcados.length < 2;
       contador.textContent = marcados.length;
-      valor.classList.toggle('vazio', !marcados.length);
+      valor.classList.toggle('sem-escolha', !marcados.length);
       valor.textContent = !marcados.length ? todos
         : marcados.length === 1 ? marcados[0] : marcados.length + ' selecionados';
       botao.title = marcados.join('\n');

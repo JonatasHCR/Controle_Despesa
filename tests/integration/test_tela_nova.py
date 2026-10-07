@@ -17,7 +17,7 @@ def cliente(entrar, leitor, carregado):
 
 
 def _dados_dos_graficos(corpo: str) -> dict:
-    bloco = re.search(r'<script type="application/json" id="dados-graficos">(.*?)</script>', corpo, re.S)
+    bloco = re.search(r'id="dados-graficos">(.*?)</script>', corpo, re.S)
     return json.loads(bloco.group(1))
 
 

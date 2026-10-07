@@ -118,7 +118,8 @@
               autoSkip: false,
               callback: function (valor) {
                 var texto = this.getLabelForValue(valor);
-                return texto.length > 28 ? texto.slice(0, 27) + '…' : texto;
+                var maximo = caixa.clientWidth < 480 ? 16 : 28;
+                return texto.length > maximo ? texto.slice(0, maximo - 1) + '…' : texto;
               },
             },
           },

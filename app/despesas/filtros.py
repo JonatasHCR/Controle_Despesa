@@ -161,7 +161,9 @@ def agrupar(session, filtro: Filtro, *, por: str, ordem: str = "maior") -> list[
     ]
 
 
-def agrupar_em_dois(session, filtro: Filtro, *, por: str, detalhe: str) -> dict[str, list[LinhaAgrupada]]:
+def agrupar_em_dois(
+    session, filtro: Filtro, *, por: str, detalhe: str
+) -> dict[str, list[LinhaAgrupada]]:
     """O detalhe de cada grupo, maior primeiro (cronológico no tempo)."""
     if por not in AGRUPAMENTOS or detalhe not in AGRUPAMENTOS or por == detalhe:
         raise ValueError(f"agrupamento desconhecido: {por!r}/{detalhe!r}")

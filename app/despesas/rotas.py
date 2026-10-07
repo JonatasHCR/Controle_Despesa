@@ -29,6 +29,7 @@ bp = Blueprint("despesas", __name__)
 
 POR_PAGINA = 50
 POR_PAGINA_OPCOES = (25, 50, 100)
+NO_RANKING = 8
 
 
 @bp.get("/")
@@ -49,7 +50,7 @@ def painel():
 
     nomes = dict(db.session.execute(select(CentroCusto.codigo, CentroCusto.nome)).all())
     por_centro = agrupar(db.session, filtro, por="centro")
-    fornecedores = agrupar(db.session, filtro, por="fornecedor")[:8]
+    fornecedores = agrupar(db.session, filtro, por="fornecedor")
 
     ultimos = db.session.scalars(
         aplicar(select(Despesa), replace(filtro, ordem="data", decrescente=True)).limit(8)
@@ -63,14 +64,25 @@ def painel():
         resumo=resumo,
         grafico={
             "natureza": [
-                {"rotulo": linha.rotulo, "total": float(linha.total), "quantidade": linha.quantidade}
+                {
+                    "rotulo": linha.rotulo,
+                    "total": float(linha.total),
+                    "quantidade": linha.quantidade,
+                }
                 for linha in por_natureza
             ],
             "tempo": [_ponto_no_tempo(linha, ver, filtro) for linha in no_tempo],
             "naturezas": filtro.naturezas,
         },
-        ranking_centros=_ranking(por_centro, "centro", lambda c: _nome_do_centro(c, nomes)),
-        ranking_fornecedores=_ranking(fornecedores, "fornecedor", lambda f: f),
+        ranking_centros=_ranking(
+            por_centro[:NO_RANKING], resumo.total_baixado, "centro",
+            lambda c: _nome_do_centro(c, nomes),
+        ),
+        ranking_fornecedores=_ranking(
+            fornecedores[:NO_RANKING], resumo.total_baixado, "fornecedor", lambda f: f
+        ),
+        total_de_centros=len(por_centro),
+        total_de_fornecedores=len(fornecedores),
         ultimos=ultimos,
         chips=chips_do_filtro(request.args),
         atalhos=atalhos_de_periodo(db.session, filtro, request.args),
@@ -96,11 +108,11 @@ def _nome_do_centro(codigo: str, nomes: dict) -> str:
     return f"{codigo} · {nome}" if nome and nome != codigo else codigo
 
 
-def _ranking(linhas, chave: str, rotulo) -> list[dict]:
+def _ranking(linhas, total, chave: str, rotulo) -> list[dict]:
     """Cada linha com a barra relativa à maior e o link que liga ou desliga o filtro."""
     escolhidos = request.args.getlist(chave)
     maior = max((linha.total for linha in linhas), default=0) or 1
-    soma = sum((linha.total for linha in linhas), Decimal("0")) or 1
+    soma = total or 1
     return [
         {
             "rotulo": rotulo(linha.rotulo),

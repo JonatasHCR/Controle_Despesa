@@ -1162,7 +1162,9 @@ td.sem-nota { color: var(--faint); }
 
 /* --- filtros ------------------------------------------------------------- */
 
-.filtros { flex-direction: column; align-items: stretch; gap: var(--e3); }
+.filtros { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: var(--e3); }
+.escolha-do-grafico { display: flex; gap: var(--e1); flex-wrap: wrap; }
+.escolha-do-grafico select { padding-right: 22px; background-position: right 7px center; min-height: 28px; }
 .filtros-linha { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: flex-end; }
 .js .filtros-mais:not(.aberta) { display: none; }
 .filtros-rodape { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; }
@@ -1237,7 +1239,7 @@ td.sem-nota { color: var(--faint); }
 .multi-botao:hover { background-color: var(--surface); }
 .campo-multi.aberto .multi-botao { border-color: var(--viz-serie); box-shadow: var(--anel); }
 .multi-valor { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.multi-valor.vazio { color: var(--faint); }
+.multi-valor.sem-escolha { color: var(--faint); }
 .multi-contador {
   background: var(--brand);
   color: #fff;
@@ -1285,7 +1287,10 @@ mark { background: var(--aviso-toque); color: inherit; border-radius: 2px; }
 
 /* --- painel -------------------------------------------------------------- */
 
-.secundarias { grid-template-columns: repeat(4, 1fr); }
+.secundarias { grid-template-columns: 1fr 1fr 0.7fr 1.6fr; }
+dialog:focus { outline: none; }
+a.legenda-cartao { text-decoration: none; }
+a.legenda-cartao:hover { color: var(--brand); }
 .graficos-iguais { grid-template-columns: 1fr 1fr; }
 .cartao-topo .dica { font-size: 11.5px; font-weight: 400; color: var(--faint); margin-left: 6px; }
 .tela-grafico { position: relative; height: 280px; }
