@@ -50,6 +50,9 @@ services:
       INVENTARIO_PORT: ${INVENTARIO_PORT:-3030}
       RECEITA_PORT: ${RECEITA_PORT:-3040}
       DESPESA_PORT: ${DESPESA_PORT:-3010}
+      CONTROLE_FINANCEIRO_PORT: ${CONTROLE_FINANCEIRO_PORT:-3060}
+      # Token que o Controle Financeiro usa para ler /api/v1. Vazio = API desligada.
+      SYNC_API_TOKEN: ${CONTROLE_SYNC_API_TOKEN:-}
     volumes:
       - ./backups:/backups
     ports:

@@ -59,6 +59,11 @@ class Base:
     INVENTARIO_PORT = os.environ.get("INVENTARIO_PORT", "3030")
     RECEITA_PORT = os.environ.get("RECEITA_PORT", "3040")
     DESPESA_PORT = os.environ.get("DESPESA_PORT", "3010")
+    CONTROLE_FINANCEIRO_PORT = os.environ.get("CONTROLE_FINANCEIRO_PORT", "3060")
+
+    # --- API de sincronizacao (Controle Financeiro) ------------------------
+    # Vazio = API desligada (503).
+    SYNC_API_TOKEN = os.environ.get("SYNC_API_TOKEN", "")
 
     # --- Rate limit ------------------------------------------------------
     # Em memoria, por worker. Nao ha Redis nessa infra, e o alvo aqui e conter

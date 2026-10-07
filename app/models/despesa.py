@@ -104,6 +104,7 @@ class Despesa(db.Model):
         CheckConstraint("valor_baixado IS NULL OR valor_baixado >= 0", name="ck_despesa_baixado"),
         Index("ix_despesas_periodo_centro", "data_baixa", "centro_custo_id"),
         Index("ix_despesas_centro_natureza_data", "centro_custo_id", "natureza_id", "data_baixa"),
+        Index("ix_despesas_atualizado_em", "atualizado_em", "id"),
     )
 
     @hybrid_property
