@@ -138,6 +138,7 @@ def _listas_de_dominio() -> dict:
 
 def _registrar_blueprints(app: Flask) -> None:
     from app.admin.rotas import bp as admin
+    from app.api.rotas import bp as api
     from app.auditoria.rotas import bp as auditoria
     from app.auth.rotas import bp as auth
     from app.cli import bp as cli
@@ -145,7 +146,7 @@ def _registrar_blueprints(app: Flask) -> None:
     from app.importacao.rotas import bp as importacao
     from app.relatorios.rotas import bp as relatorios
 
-    for blueprint in (auth, despesas, importacao, relatorios, auditoria, admin, cli):
+    for blueprint in (auth, despesas, importacao, relatorios, auditoria, admin, api, cli):
         app.register_blueprint(blueprint)
 
     # Reconfere o grupo no Keycloak enquanto a sessao esta aberta: sem isto,

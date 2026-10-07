@@ -6,6 +6,7 @@ Despesa` sem saber em qual arquivo cada um mora.
 
 from app.models.auditoria import Auditoria
 from app.models.despesa import Despesa
+from app.models.despesa_excluida import DespesaExcluida
 from app.models.dominio import CentroCusto, Fornecedor, Natureza
 from app.models.importacao import Importacao
 from app.models.usuario import PERFIS, Usuario
@@ -14,6 +15,7 @@ __all__ = [
     "Auditoria",
     "CentroCusto",
     "Despesa",
+    "DespesaExcluida",
     "Fornecedor",
     "Importacao",
     "Natureza",

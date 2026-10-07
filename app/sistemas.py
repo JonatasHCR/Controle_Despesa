@@ -63,6 +63,11 @@ def sistemas() -> list[dict]:
             "nome": "Radar",
             "url": f"{_host()}:{current_app.config['DESPESA_PORT']}",
         },
+        {
+            "grupo": "/apps/controle-financeiro",
+            "nome": "Controle Financeiro",
+            "url": f"{_host()}:{current_app.config['CONTROLE_FINANCEIRO_PORT']}",
+        },
     ]
 
 
