@@ -95,7 +95,7 @@ def test_campo_referencia_vazio_nao_filtra(carregado):
 def test_busca_pela_referencia_no_painel(entrar, leitor, carregado):
     """O painel não tem o campo dedicado; a caixa Buscar precisa dar conta."""
     corpo = entrar(leitor).get("/?busca=136914").get_data(as_text=True)
-    assert "em 1 lançamento" in corpo
+    assert corpo.count("data-detalhe=") == 1
 
 
 def test_busca_pela_referencia_na_lista(entrar, leitor, carregado):

@@ -78,11 +78,21 @@ def test_links_de_paginacao_apontam_para_a_pagina_certa(cliente):
     assert "pagina=3" in corpo
 
 
-def test_paginacao_do_painel_tambem_funciona(cliente):
-    primeira = referencias_na_pagina(cliente.get("/?pagina=1").get_data(as_text=True))
-    segunda = referencias_na_pagina(cliente.get("/?pagina=2").get_data(as_text=True))
-    assert primeira and segunda
-    assert not set(primeira) & set(segunda)
+def test_painel_mostra_so_os_ultimos_e_leva_para_a_lista(cliente):
+    corpo = cliente.get("/").get_data(as_text=True)
+    assert corpo.count("data-detalhe=") == 8
+    assert "Ver todos os 127" in corpo
+
+
+def test_lista_aceita_outro_tamanho_de_pagina(cliente):
+    corpo = cliente.get("/despesas?por_pagina=25").get_data(as_text=True)
+    assert len(referencias_na_pagina(corpo)) == 25
+    assert "Mostrando 1–25 de 127" in corpo
+
+
+def test_tamanho_de_pagina_fora_da_lista_volta_ao_padrao(cliente):
+    corpo = cliente.get("/despesas?por_pagina=5000").get_data(as_text=True)
+    assert len(referencias_na_pagina(corpo)) == 50
 
 
 def test_paginacao_da_auditoria(entrar, admin, db):

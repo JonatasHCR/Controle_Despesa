@@ -4,19 +4,20 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
+from flask import Blueprint, Response, flash, jsonify, redirect, render_template, request, url_for
 from sqlalchemy import select
 
 from app.auditoria.servico import registrar
 from app.auth.guardas import login_obrigatorio, usuario_atual
 from app.despesas.consulta import (
     agrupamento_da_query,
+    atalhos_de_periodo,
     chips_do_filtro,
     filtro_da_query,
     opcoes,
     query_sem,
 )
-from app.despesas.filtros import agrupar, aplicar, totais
+from app.despesas.filtros import AGRUPAMENTOS, agrupar, agrupar_em_dois, aplicar, totais
 from app.extensions import db, limiter
 from app.formato import data_curta
 from app.models import Despesa
@@ -33,6 +34,8 @@ TITULOS = {
     "dia": "Dia",
 }
 
+MOSTRAR = (10, 20)
+
 TIPOS = {
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "pdf": "application/pdf",
@@ -43,18 +46,39 @@ TIPOS = {
 @login_obrigatorio
 def montar():
     filtro = filtro_da_query(request.args, sessao=db.session)
-    por = agrupamento_da_query(request.args)
+    # Na tela sempre há agrupamento; natureza é o recorte mais pedido.
+    por = agrupamento_da_query(request.args) or "natureza"
+    detalhar = request.args.get("detalhar")
+    if detalhar not in AGRUPAMENTOS or detalhar == por:
+        detalhar = None
+    mostrar = request.args.get("mostrar", type=int)
+    if mostrar not in MOSTRAR:
+        mostrar = None
+
+    resumo = totais(db.session, filtro)
+    grupos = agrupar(db.session, filtro, por=por)
+    maior = max((grupo.total for grupo in grupos), default=0) or 1
+    query_base = query_sem(request.args, "pagina", "agrupar")
+    query_base["agrupar"] = [por]
     return render_template(
         "relatorios/montar.html",
         secao="relatorios",
         filtro=filtro,
         agrupamento=por,
+        detalhar=detalhar,
+        mostrar=mostrar,
+        titulos=TITULOS,
         opcoes=opcoes(db.session),
-        resumo=totais(db.session, filtro),
-        grupos=agrupar(db.session, filtro, por=por) if por else None,
-        titulo_do_grupo=TITULOS.get(por, ""),
+        resumo=resumo,
+        grupos=grupos[:mostrar] if mostrar else grupos,
+        total_de_grupos=len(grupos),
+        maior=maior,
+        detalhes=agrupar_em_dois(db.session, filtro, por=por, detalhe=detalhar) if detalhar else {},
+        titulo_do_grupo=TITULOS[por],
         chips=chips_do_filtro(request.args),
-        query_base=query_sem(request.args, "pagina"),
+        atalhos=atalhos_de_periodo(db.session, filtro, request.args),
+        descricao=descrever(filtro, por),
+        query_base=query_base,
     )
 
 
@@ -84,6 +108,9 @@ def baixar(formato: str):
             titulo_do_grupo=TITULOS.get(por, ""),
         )
     except pdf.RelatorioGrandeDemais as erro:
+        # A janela de exportação mostra a mensagem no lugar do arquivo.
+        if request.headers.get("X-Exportar"):
+            return jsonify(erro=str(erro)), 422
         flash(str(erro), "atencao")
         return redirect(url_for("relatorios.montar", **query_sem(request.args)))
 

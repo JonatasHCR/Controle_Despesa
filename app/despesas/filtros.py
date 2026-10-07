@@ -161,6 +161,38 @@ def agrupar(session, filtro: Filtro, *, por: str, ordem: str = "maior") -> list[
     ]
 
 
+def agrupar_em_dois(session, filtro: Filtro, *, por: str, detalhe: str) -> dict[str, list[LinhaAgrupada]]:
+    """O detalhe de cada grupo, maior primeiro (cronológico no tempo)."""
+    if por not in AGRUPAMENTOS or detalhe not in AGRUPAMENTOS or por == detalhe:
+        raise ValueError(f"agrupamento desconhecido: {por!r}/{detalhe!r}")
+
+    rotulo, juncao, _ = _eixo(por, filtro)
+    rotulo_detalhe, juncao_detalhe, cronologico = _eixo(detalhe, filtro)
+
+    consulta = select(
+        rotulo.label("grupo"),
+        rotulo_detalhe.label("rotulo"),
+        func.count(Despesa.id).label("quantidade"),
+        func.coalesce(func.sum(Despesa.valor_baixado), ZERO).label("total"),
+    )
+    for tabela in (juncao, juncao_detalhe):
+        if tabela is not None:
+            consulta = consulta.join(tabela)
+    consulta = _condicoes(consulta, filtro).group_by(rotulo, rotulo_detalhe)
+    consulta = consulta.order_by(
+        func.min(filtro.coluna_de_data).asc()
+        if cronologico
+        else func.sum(Despesa.valor_baixado).desc()
+    )
+
+    resultado: dict[str, list[LinhaAgrupada]] = {}
+    for linha in session.execute(consulta):
+        resultado.setdefault(linha.grupo, []).append(
+            LinhaAgrupada(rotulo=linha.rotulo, quantidade=linha.quantidade, total=linha.total)
+        )
+    return resultado
+
+
 def _eixo(por: str, filtro: Filtro):
     """Devolve (expressao do rotulo, tabela a juntar, e se e cronologico)."""
     if por == "natureza":

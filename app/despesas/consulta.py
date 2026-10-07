@@ -159,6 +159,53 @@ def chips_do_filtro(args) -> list[Chip]:
     return lista
 
 
+def atalhos_de_periodo(sessao, filtro: Filtro, args) -> list[dict]:
+    """Tudo, o último mês com lançamento, os últimos três meses e os dois anos."""
+    from calendar import monthrange
+
+    from sqlalchemy import func
+
+    from app.formato import mes_curto
+
+    def item(rotulo, inicio, fim):
+        base = query_sem(args, "inicio", "fim", "pagina")
+        if inicio:
+            base.update(inicio=[inicio.isoformat()], fim=[fim.isoformat()])
+        ativo = filtro.inicio == inicio and filtro.fim == fim
+        return {"rotulo": rotulo, "args": base, "ativo": ativo}
+
+    lista = [item("Tudo", None, None)]
+    ultima = sessao.scalar(select(func.max(filtro.coluna_de_data))) if sessao else None
+    if ultima is None:
+        return lista
+
+    fim_do_mes = date(ultima.year, ultima.month, monthrange(ultima.year, ultima.month)[1])
+    if ultima.month > 2:
+        ano, mes = ultima.year, ultima.month - 2
+    else:
+        ano, mes = ultima.year - 1, ultima.month + 10
+    lista += [
+        item(f"{mes_curto(ultima.month)}/{ultima.year}",
+             date(ultima.year, ultima.month, 1), fim_do_mes),
+        item("Últimos 3 meses", date(ano, mes, 1), fim_do_mes),
+        item(str(ultima.year), date(ultima.year, 1, 1), date(ultima.year, 12, 31)),
+        item(str(ultima.year - 1), date(ultima.year - 1, 1, 1), date(ultima.year - 1, 12, 31)),
+    ]
+    return lista
+
+
+def alternar(args, chave: str, valor: str) -> dict:
+    """A query string com `valor` posto em `chave`, ou tirado se já estava."""
+    base = query_sem(args, "pagina")
+    atuais = base.get(chave, [])
+    novos = [v for v in atuais if v != valor] if valor in atuais else atuais + [valor]
+    if novos:
+        base[chave] = novos
+    else:
+        base.pop(chave, None)
+    return base
+
+
 def _curta(valor: date) -> str:
     return f"{valor.day:02d}/{valor.month:02d}/{valor.year}"
 

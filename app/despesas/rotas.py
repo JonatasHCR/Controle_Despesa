@@ -13,6 +13,8 @@ from app.auditoria.servico import registrar
 from app.auth.guardas import login_obrigatorio, requer, usuario_atual
 from app.despesas.consulta import (
     agrupamento_da_query,
+    alternar,
+    atalhos_de_periodo,
     chips_do_filtro,
     filtro_da_query,
     opcoes,
@@ -21,12 +23,12 @@ from app.despesas.consulta import (
 from app.despesas.filtros import ORDENS_DO_GRUPO, agrupar, aplicar, totais
 from app.extensions import db
 from app.formato import mes_curto
-from app.graficos import svg
-from app.models import CentroCusto, Despesa, Fornecedor, Natureza
+from app.models import Auditoria, CentroCusto, Despesa, Fornecedor, Natureza, Usuario
 
 bp = Blueprint("despesas", __name__)
 
 POR_PAGINA = 50
+POR_PAGINA_OPCOES = (25, 50, 100)
 
 
 @bp.get("/")
@@ -35,8 +37,6 @@ def painel():
     filtro = filtro_da_query(request.args, sessao=db.session)
     resumo = totais(db.session, filtro)
 
-    # Os gráficos leem o mesmo filtro; o que o usuário escolhe é como fatiar o
-    # tempo e em que ordem ver as naturezas.
     ver = request.args.get("ver") if request.args.get("ver") in VISOES else "mes"
     do_grafico, rotulo = _recorte_do_grafico(request.args, filtro, ver)
     ordem = request.args.get("ordem_natureza")
@@ -45,18 +45,15 @@ def painel():
 
     por_natureza = agrupar(db.session, do_grafico, por="natureza", ordem=ordem)
     no_tempo = agrupar(db.session, do_grafico, por=ver)
+    meses = len(agrupar(db.session, filtro, por="mes"))
 
-    sufixo = f" · {rotulo}" if rotulo else ""
-    grafico_natureza = svg.barras_horizontais(
-        [(linha.rotulo, linha.total) for linha in por_natureza],
-        titulo=f"Despesa por natureza{sufixo}",
-    )
-    grafico_mes = svg.colunas(
-        [(_rotulo_no_tempo(linha.rotulo, ver), linha.total) for linha in no_tempo],
-        titulo=f"Despesa por {VISOES[ver]}{sufixo}",
-    )
+    nomes = dict(db.session.execute(select(CentroCusto.codigo, CentroCusto.nome)).all())
+    por_centro = agrupar(db.session, filtro, por="centro")
+    fornecedores = agrupar(db.session, filtro, por="fornecedor")[:8]
 
-    pagina = _pagina(filtro)
+    ultimos = db.session.scalars(
+        aplicar(select(Despesa), replace(filtro, ordem="data", decrescente=True)).limit(8)
+    ).all()
 
     return render_template(
         "despesas/painel.html",
@@ -64,12 +61,21 @@ def painel():
         filtro=filtro,
         opcoes=opcoes(db.session),
         resumo=resumo,
-        grafico_natureza=grafico_natureza,
-        grafico_mes=grafico_mes,
-        pagina=pagina,
+        grafico={
+            "natureza": [
+                {"rotulo": linha.rotulo, "total": float(linha.total), "quantidade": linha.quantidade}
+                for linha in por_natureza
+            ],
+            "tempo": [_ponto_no_tempo(linha, ver, filtro) for linha in no_tempo],
+            "naturezas": filtro.naturezas,
+        },
+        ranking_centros=_ranking(por_centro, "centro", lambda c: _nome_do_centro(c, nomes)),
+        ranking_fornecedores=_ranking(fornecedores, "fornecedor", lambda f: f),
+        ultimos=ultimos,
         chips=chips_do_filtro(request.args),
-        meses=len(agrupar(db.session, filtro, por="mes")),
-        periodos=len(no_tempo),
+        atalhos=atalhos_de_periodo(db.session, filtro, request.args),
+        meses=meses,
+        media_mensal=(resumo.total_baixado / meses) if meses else None,
         ver=ver,
         visoes=VISOES,
         ordem_natureza=ordem,
@@ -79,12 +85,57 @@ def painel():
         ano_escolhido=do_grafico.inicio.year,
         dia_escolhido=do_grafico.inicio.isoformat(),
         fornecedor_divergente=_fornecedor_das_divergencias(filtro),
-        # Sem "divergentes" para o link "ver os divergentes" poder acrescentá-lo;
-        # com ele no do relatório, que precisa do recorte inteiro.
+        # Sem "divergentes" para o link "ver os divergentes" poder acrescentá-lo.
         query_base=query_sem(request.args, "pagina", "divergentes"),
         query_completa=query_sem(request.args, "pagina"),
-        query_ordem=query_sem(request.args, "pagina", "ordem", "desc"),
     )
+
+
+def _nome_do_centro(codigo: str, nomes: dict) -> str:
+    nome = nomes.get(codigo)
+    return f"{codigo} · {nome}" if nome and nome != codigo else codigo
+
+
+def _ranking(linhas, chave: str, rotulo) -> list[dict]:
+    """Cada linha com a barra relativa à maior e o link que liga ou desliga o filtro."""
+    escolhidos = request.args.getlist(chave)
+    maior = max((linha.total for linha in linhas), default=0) or 1
+    soma = sum((linha.total for linha in linhas), Decimal("0")) or 1
+    return [
+        {
+            "rotulo": rotulo(linha.rotulo),
+            "total": linha.total,
+            "quantidade": linha.quantidade,
+            "largura": round(float(linha.total / maior) * 100, 1),
+            "fatia": float(linha.total / soma) * 100,
+            "escolhido": linha.rotulo in escolhidos,
+            "args": alternar(request.args, chave, linha.rotulo),
+        }
+        for linha in linhas
+    ]
+
+
+def _ponto_no_tempo(linha, ver: str, filtro) -> dict:
+    """O ponto do gráfico e o período que um clique nele filtra."""
+    from calendar import monthrange
+
+    partes = [int(parte) for parte in linha.rotulo.split("/")]
+    if ver == "ano":
+        inicio, fim = date(partes[0], 1, 1), date(partes[0], 12, 31)
+    elif ver == "mes":
+        mes, ano = partes
+        inicio, fim = date(ano, mes, 1), date(ano, mes, monthrange(ano, mes)[1])
+    else:
+        dia, mes, ano = partes
+        inicio = fim = date(ano, mes, dia)
+    return {
+        "rotulo": _rotulo_no_tempo(linha.rotulo, ver),
+        "titulo": linha.rotulo,
+        "total": float(linha.total),
+        "inicio": inicio.isoformat(),
+        "fim": fim.isoformat(),
+        "escolhido": filtro.inicio == inicio and filtro.fim == fim,
+    }
 
 
 @bp.get("/despesas")
@@ -92,17 +143,23 @@ def painel():
 def lista():
     filtro = filtro_da_query(request.args, sessao=db.session)
     por = agrupamento_da_query(request.args)
+    por_pagina = request.args.get("por_pagina", type=int)
+    if por_pagina not in POR_PAGINA_OPCOES:
+        por_pagina = POR_PAGINA
 
     contexto = {
         "secao": "despesas",
         "filtro": filtro,
         "opcoes": opcoes(db.session),
         "resumo": totais(db.session, filtro),
-        "pagina": _pagina(filtro),
+        "pagina": _pagina(filtro, por_pagina),
+        "por_pagina": por_pagina,
         "agrupamento": por,
+        "atalhos": atalhos_de_periodo(db.session, filtro, request.args),
         "grupos": agrupar(db.session, filtro, por=por) if por else None,
         "chips": chips_do_filtro(request.args),
         "query_base": query_sem(request.args, "pagina"),
+        "query_sem_divergentes": query_sem(request.args, "pagina", "divergentes"),
         "query_ordem": query_sem(request.args, "pagina", "ordem", "desc"),
     }
 
@@ -110,6 +167,26 @@ def lista():
     if request.headers.get("HX-Request"):
         return render_template("despesas/_resultado.html", **contexto)
     return render_template("despesas/lista.html", **contexto)
+
+
+@bp.get("/despesas/<int:identificador>")
+@login_obrigatorio
+def detalhe(identificador: int):
+    """O painel lateral de um lançamento, com o que a auditoria tem dele."""
+    despesa = db.session.get(Despesa, identificador) or abort(404)
+    historico = db.session.execute(
+        select(Auditoria, Usuario.nome)
+        .outerjoin(Usuario, Auditoria.usuario_id == Usuario.id)
+        .where(Auditoria.alvo_tipo == "despesa", Auditoria.alvo_id == identificador)
+        .order_by(Auditoria.criado_em.desc())
+        .limit(10)
+    ).all()
+    return render_template(
+        "despesas/_detalhe.html",
+        despesa=despesa,
+        historico=historico,
+        query_base=query_sem(request.args),
+    )
 
 
 @bp.route("/despesas/nova", methods=["GET", "POST"])
@@ -315,14 +392,14 @@ def _de_volta_para_a_lista():
     return redirect(url_for("despesas.lista", **query_sem(request.args)))
 
 
-def _pagina(filtro):
+def _pagina(filtro, por_pagina: int = POR_PAGINA):
     consulta = aplicar(select(Despesa), filtro)
     # `page` explicito: o db.paginate le a query string sozinho, mas procura por
     # `page`, e as URLs deste sistema usam `pagina`.
     return db.paginate(
         consulta,
         page=request.args.get("pagina", 1, type=int),
-        per_page=POR_PAGINA,
+        per_page=por_pagina,
         error_out=False,
     )
 

@@ -80,7 +80,9 @@ def test_painel_traz_os_indicadores_e_os_dois_graficos(entrar, leitor, carregado
     corpo = entrar(leitor).get("/").get_data(as_text=True)
     assert "R$ 442.949,60" in corpo
     assert "Total baixado" in corpo
-    assert corpo.count("<svg") == 2
+    assert 'data-grafico="natureza"' in corpo
+    assert 'data-grafico="tempo"' in corpo
+    assert 'id="dados-graficos"' in corpo
     assert "Despesa por natureza" in corpo
     assert "Despesa por mês" in corpo
 
