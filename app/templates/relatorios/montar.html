@@ -2,38 +2,125 @@
 {% block titulo %}Relatórios · Controle de Despesa{% endblock %}
 
 {% block conteudo %}
-  <h1>Relatórios</h1>
-  <p class="legenda-pagina">
-    Escolha o recorte e o agrupamento. Os subtotais são calculados sobre o filtro —
-    só do agrupamento pedido, mais o total geral.
-  </p>
+  <div class="cabecalho-pagina">
+    <div>
+      <h1>Relatórios</h1>
+      {% if chips %}
+        {% include 'despesas/_chips.html' %}
+      {% else %}
+        <p class="legenda-pagina sem-margem">Todos os lançamentos. Os subtotais saem do recorte filtrado.</p>
+      {% endif %}
+    </div>
+    <div class="acoes">
+      <a class="botao" href="{{ url_for('relatorios.baixar', formato='xlsx', **query_base) }}"
+         data-exportar="Excel" data-total="{{ resumo.total_baixado | moeda }}"
+         data-linhas="{{ total_de_grupos | numero }} grupos" data-filtro="{{ descricao }}">Gerar Excel</a>
+      <a class="botao botao-principal" href="{{ url_for('relatorios.baixar', formato='pdf', **query_base) }}"
+         data-exportar="PDF" data-total="{{ resumo.total_baixado | moeda }}"
+         data-linhas="{{ total_de_grupos | numero }} grupos" data-filtro="{{ descricao }}">Gerar PDF</a>
+    </div>
+  </div>
 
-  {% with acao = url_for('relatorios.montar'), detalhado = true, htmx = false %}
+  {% with acao = url_for('relatorios.montar'), agrupavel = false, htmx = false %}
     {% include 'despesas/_filtros.html' %}
   {% endwith %}
 
-  <div class="cartao">
-    <h2>
-      {{ resumo.lancamentos | numero }} lançamento{{ 's' if resumo.lancamentos != 1 }}
-      · {{ resumo.total_baixado | moeda }}
-      {% if resumo.divergentes %}
-        <span class="selo divergente">⚠ {{ resumo.divergentes }} divergente{{ 's' if resumo.divergentes != 1 }}</span>
+  <div class="cartao cartao-tabela">
+    <form method="get" action="{{ url_for('relatorios.montar') }}" class="controles-relatorio">
+      {% for chave, valores in request.args.lists() if chave not in ('agrupar', 'detalhar', 'mostrar') %}
+        {% for valor in valores if valor %}<input type="hidden" name="{{ chave }}" value="{{ valor }}">{% endfor %}
+      {% endfor %}
+      <div class="campo">
+        <label for="r-agrupar">Agrupar por</label>
+        <select id="r-agrupar" name="agrupar" data-enviar-ao-mudar>
+          {% for chave, rotulo in titulos.items() %}
+            <option value="{{ chave }}" {% if chave == agrupamento %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="campo">
+        <label for="r-detalhar">Detalhar por</label>
+        <select id="r-detalhar" name="detalhar" data-enviar-ao-mudar>
+          <option value="">sem detalhe</option>
+          {% for chave, rotulo in titulos.items() if chave != agrupamento %}
+            <option value="{{ chave }}" {% if chave == detalhar %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="campo">
+        <label for="r-mostrar">Mostrar</label>
+        <select id="r-mostrar" name="mostrar" data-enviar-ao-mudar>
+          <option value="">todos os grupos</option>
+          <option value="20" {% if mostrar == 20 %}selected{% endif %}>os 20 maiores</option>
+          <option value="10" {% if mostrar == 10 %}selected{% endif %}>os 10 maiores</option>
+        </select>
+      </div>
+      <span class="espaco"></span>
+      <div class="resumo-recorte">
+        <span class="total">{{ resumo.total_baixado | moeda }}</span>
+        <span class="contagem">em {{ resumo.lancamentos | numero }} lançamento{{ 's' if resumo.lancamentos != 1 }}</span>
+        {% if resumo.divergentes %}
+          <span class="selo divergente">⚠ {{ resumo.divergentes }} divergente{{ 's' if resumo.divergentes != 1 }}</span>
+        {% endif %}
+      </div>
+      {% if detalhar %}
+        <button type="button" class="botao botao-mini" data-abrir-grupos>Abrir todos</button>
+        <button type="button" class="botao botao-mini" data-fechar-grupos>Fechar todos</button>
       {% endif %}
-    </h2>
+    </form>
 
-    <div class="acoes mb">
-      <a class="botao botao-principal"
-         href="{{ url_for('relatorios.baixar', formato='pdf', **query_base) }}">Baixar PDF</a>
-      <a class="botao"
-         href="{{ url_for('relatorios.baixar', formato='xlsx', **query_base) }}">Baixar Excel</a>
+    <div class="rolagem">
+      <table class="relatorio" data-relatorio>
+        <thead>
+          <tr>
+            <th>{{ titulo_do_grupo }}</th>
+            <th class="numero">Lançamentos</th>
+            <th class="numero">Total</th>
+            <th class="numero">% do total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for grupo in grupos %}
+            {% set fatia = (100 * grupo.total / resumo.total_baixado) if resumo.total_baixado else 0 %}
+            <tr class="subtotal{{ ' com-detalhe' if detalhar }}" {% if detalhar %}data-grupo="{{ loop.index }}" tabindex="0" aria-expanded="false"{% endif %}>
+              <td>{% if detalhar %}<span class="seta-grupo" aria-hidden="true">▸</span>{% endif %}{{ grupo.rotulo }}</td>
+              <td class="numero">{{ grupo.quantidade | numero }}</td>
+              <td class="numero">{{ grupo.total | moeda }}</td>
+              <td class="numero">
+                <span class="fatia">
+                  {{ '%.1f' | format(fatia) | replace('.', ',') }}%
+                  <svg class="barra" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true">
+                    <rect class="trilho" width="100" height="6" rx="3"></rect>
+                    <rect class="cheio" width="{{ '%.1f' | format(100 * grupo.total / maior) }}" height="6" rx="3"></rect>
+                  </svg>
+                </span>
+              </td>
+            </tr>
+            {% set numero_do_grupo = loop.index %}
+            {% for item in detalhes.get(grupo.rotulo, []) %}
+              <tr class="detalhe-do-grupo" data-de-grupo="{{ numero_do_grupo }}" hidden>
+                <td>{{ item.rotulo }}</td>
+                <td class="numero">{{ item.quantidade | numero }}</td>
+                <td class="numero">{{ item.total | moeda }}</td>
+                <td class="numero discreto">{{ '%.1f' | format(100 * item.total / grupo.total if grupo.total else 0) | replace('.', ',') }}% do grupo</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="4" class="vazio">Nada para agrupar neste recorte.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if grupos %}
+          <tfoot>
+            <tr class="total-geral">
+              <td>Total geral{% if mostrar and total_de_grupos > grupos | length %}
+                <span class="selo">mostrando {{ grupos | length }} de {{ total_de_grupos }} grupos</span>{% endif %}</td>
+              <td class="numero">{{ resumo.lancamentos | numero }}</td>
+              <td class="numero">{{ resumo.total_baixado | moeda }}</td>
+              <td class="numero">100,0%</td>
+            </tr>
+          </tfoot>
+        {% endif %}
+      </table>
     </div>
-
-    {% if grupos %}
-      {% include 'despesas/_agrupado.html' %}
-    {% else %}
-      <p class="legenda-pagina">
-        Sem agrupamento o relatório sai como lista de lançamentos, com o total geral no rodapé.
-      </p>
-    {% endif %}
   </div>
 {% endblock %}

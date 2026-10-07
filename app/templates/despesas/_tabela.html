@@ -1,14 +1,17 @@
-{# Largura fixa por coluna e reticências nos campos de texto: os onze campos
-   cabem na tela sem barra lateral. O valor inteiro fica no `title`. #}
+{# Largura fixa por coluna e reticências nos campos de texto. O valor inteiro fica
+   no `title`, e o clique na linha abre o lançamento completo. #}
 {% if usuario.pode_escrever %}
   <form id="acao-em-lote" method="post" data-forma-lote
         action="{{ url_for('despesas.divergencia_em_lote', **query_base) }}">
     {{ form_csrf() }}
     <div class="barra-selecao" data-barra-selecao hidden>
       <span><strong data-contagem>0</strong> selecionada(s)<span data-nesta-pagina></span></span>
-      <button type="submit" name="acao" value="ignorar" class="botao botao-mini">Não comparar</button>
-      <button type="submit" name="acao" value="comparar" class="botao botao-mini">Voltar a comparar</button>
-      <button type="button" class="botao botao-mini" data-limpar-selecao>Limpar seleção</button>
+      <span class="espaco"></span>
+      <button type="submit" name="acao" value="ignorar" class="botao botao-mini"
+              title="O valor baixado passa a valer e o lançamento sai da lista de divergentes">Aceitar diferença</button>
+      <button type="submit" name="acao" value="comparar" class="botao botao-mini"
+              title="O lançamento volta a ser comparado com o valor original">Voltar a comparar</button>
+      <button type="button" class="botao botao-mini botao-fantasma" data-limpar-selecao>Limpar seleção</button>
     </div>
   </form>
 {% endif %}
@@ -52,7 +55,8 @@
     </thead>
     <tbody>
       {% for despesa in pagina.items %}
-        <tr {% if despesa.divergente %}class="linha-divergente"{% endif %}>
+        <tr {% if despesa.divergente %}class="linha-divergente"{% endif %}
+            data-detalhe="{{ url_for('despesas.detalhe', identificador=despesa.id, **query_base) }}">
           {% if usuario.pode_escrever %}
             <td class="c-marca so-tela">
               <input type="checkbox" form="acao-em-lote" name="ids" value="{{ despesa.id }}"
@@ -82,36 +86,22 @@
               {{ despesa.valor_baixado | moeda }}
             {% endif %}
           </td>
-          <td class="numero c-situacao">
-            {% if despesa.divergente %}
-              <span class="selo-diferenca"
-                    title="Original e baixado divergem em {{ despesa.diferenca | moeda }}">
-                ⚠ <span class="num">{{ despesa.diferenca | sinal }}</span>
-              </span>
-            {% elif despesa.divergencia_ignorada and despesa.diverge_nos_valores %}
-              <span class="sem-nota"
-                    title="Diferença de {{ despesa.diferenca | moeda }}, não sinalizada por escolha.">
-                não comparar
-              </span>
-            {% else %}
-              <span class="sem-nota">—</span>
-            {% endif %}
-          </td>
+          <td class="numero c-situacao">{% include 'despesas/_situacao.html' %}</td>
           {% if usuario.pode_escrever %}
             <td class="c-acao so-tela">
               <div class="acoes-da-linha">
-                <a class="botao botao-mini"
+                <a class="botao-icone"
                    href="{{ url_for('despesas.editar', identificador=despesa.id) }}"
                    title="Editar a despesa {{ despesa.referencia }}"
-                   aria-label="Editar a despesa {{ despesa.referencia }}">Editar</a>
+                   aria-label="Editar a despesa {{ despesa.referencia }}">{% include 'icones/editar.svg' %}</a>
                 {# A confirmação vem do acoes.js: handler inline não roda sob a CSP. #}
                 <form method="post"
                       action="{{ url_for('despesas.excluir', identificador=despesa.id, **query_base) }}"
                       data-confirmar="Excluir a despesa {{ despesa.referencia }} — {{ despesa.fornecedor.nome }}, {{ despesa.valor_baixado | moeda }}? A ação fica registrada na auditoria.">
                   {{ form_csrf() }}
-                  <button type="submit" class="botao botao-mini botao-excluir"
+                  <button type="submit" class="botao-icone botao-excluir"
                           title="Excluir a despesa {{ despesa.referencia }}"
-                          aria-label="Excluir a despesa {{ despesa.referencia }}">Excluir</button>
+                          aria-label="Excluir a despesa {{ despesa.referencia }}">{% include 'icones/excluir.svg' %}</button>
                 </form>
               </div>
             </td>
@@ -128,26 +118,49 @@
   </table>
 </div>
 
-{% if pagina.pages > 1 %}
-  <nav class="paginacao" aria-label="Paginação">
-    {% if pagina.has_prev %}
-      <a href="{{ url_for(request.endpoint, pagina=pagina.prev_num, **query_base) }}"
-         aria-label="Página anterior">‹</a>
+<div class="rodape-tabela">
+  <span class="legenda-cartao">
+    {% if pagina.total %}
+      Mostrando {{ ((pagina.page - 1) * pagina.per_page + 1) | numero }}–{{ [pagina.page * pagina.per_page, pagina.total] | min | numero }}
+      de {{ pagina.total | numero }}
     {% endif %}
-    {% for numero in pagina.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
-      {% if numero %}
-        {% if numero == pagina.page %}
-          <span class="atual" aria-current="page">{{ numero }}</span>
-        {% else %}
-          <a href="{{ url_for(request.endpoint, pagina=numero, **query_base) }}">{{ numero }}</a>
-        {% endif %}
-      {% else %}
-        <span class="reticencias">…</span>
+  </span>
+
+  {% if pagina.pages > 1 %}
+    <nav class="paginacao" aria-label="Paginação">
+      {% if pagina.has_prev %}
+        <a href="{{ url_for(request.endpoint, pagina=pagina.prev_num, **query_base) }}"
+           aria-label="Página anterior">‹</a>
       {% endif %}
-    {% endfor %}
-    {% if pagina.has_next %}
-      <a href="{{ url_for(request.endpoint, pagina=pagina.next_num, **query_base) }}"
-         aria-label="Próxima página">›</a>
-    {% endif %}
-  </nav>
-{% endif %}
+      {% for numero in pagina.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+        {% if numero %}
+          {% if numero == pagina.page %}
+            <span class="atual" aria-current="page">{{ numero }}</span>
+          {% else %}
+            <a href="{{ url_for(request.endpoint, pagina=numero, **query_base) }}">{{ numero }}</a>
+          {% endif %}
+        {% else %}
+          <span class="reticencias">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if pagina.has_next %}
+        <a href="{{ url_for(request.endpoint, pagina=pagina.next_num, **query_base) }}"
+           aria-label="Próxima página">›</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+
+  {% if por_pagina %}
+    <form method="get" action="{{ url_for(request.endpoint) }}" class="por-pagina">
+      {% for chave, valores in query_base.items() if chave != 'por_pagina' %}
+        {% for valor in valores %}<input type="hidden" name="{{ chave }}" value="{{ valor }}">{% endfor %}
+      {% endfor %}
+      <label for="por-pagina">por página</label>
+      <select id="por-pagina" name="por_pagina" data-enviar-ao-mudar>
+        {% for opcao in (25, 50, 100) %}
+          <option value="{{ opcao }}" {% if opcao == por_pagina %}selected{% endif %}>{{ opcao }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  {% endif %}
+</div>

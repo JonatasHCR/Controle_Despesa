@@ -6,9 +6,13 @@
         em {{ resumo.lancamentos | numero }} lançamento{{ 's' if resumo.lancamentos != 1 }}
       </span>
       {% if resumo.divergentes %}
-        <span class="selo divergente">
-          ⚠ {{ resumo.divergentes }} divergente{{ 's' if resumo.divergentes != 1 }}
-        </span>
+        {% if filtro.somente_divergentes %}
+          <a class="selo divergente" href="{{ url_for(request.endpoint, **query_sem_divergentes) }}"
+             title="Mostrar todos">⚠ {{ resumo.divergentes }} divergente{{ 's' if resumo.divergentes != 1 }} ×</a>
+        {% else %}
+          <a class="selo divergente" href="{{ url_for(request.endpoint, divergentes=1, **query_base) }}"
+             title="Mostrar só os divergentes">⚠ {{ resumo.divergentes }} divergente{{ 's' if resumo.divergentes != 1 }}</a>
+        {% endif %}
       {% endif %}
     </div>
 
@@ -16,8 +20,12 @@
        de fora estes links ficariam com o recorte de quando a página carregou. #}
     <div class="acoes-do-recorte">
       <a class="botao botao-mini" href="{{ url_for('relatorios.baixar', formato='xlsx', **query_base) }}"
+         data-exportar="Excel" data-total="{{ resumo.total_baixado | moeda }}"
+         data-linhas="{{ resumo.lancamentos | numero }} lançamentos"
          title="Excel com exatamente este recorte">Excel</a>
       <a class="botao botao-mini" href="{{ url_for('relatorios.baixar', formato='pdf', **query_base) }}"
+         data-exportar="PDF" data-total="{{ resumo.total_baixado | moeda }}"
+         data-linhas="{{ resumo.lancamentos | numero }} lançamentos"
          title="PDF com exatamente este recorte">PDF</a>
     </div>
   </div>

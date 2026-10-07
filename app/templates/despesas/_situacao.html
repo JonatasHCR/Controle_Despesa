@@ -1,0 +1,13 @@
+{% if despesa.divergente %}
+  <span class="selo-diferenca"
+        title="Original e baixado divergem em {{ despesa.diferenca | moeda }}">
+    ⚠ <span class="num">{{ despesa.diferenca | sinal }}</span>
+  </span>
+{% elif despesa.divergencia_ignorada and despesa.diverge_nos_valores %}
+  <span class="sem-nota"
+        title="Diferença de {{ despesa.diferenca | moeda }}, não sinalizada por escolha.">
+    diferença aceita
+  </span>
+{% else %}
+  <span class="sem-nota">—</span>
+{% endif %}

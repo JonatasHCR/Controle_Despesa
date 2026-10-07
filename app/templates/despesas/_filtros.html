@@ -1,66 +1,71 @@
-{# Formulario de filtro. GET, para o recorte ficar na URL e poder ser copiado.
+{# Formulário de filtro. GET, para o recorte ficar na URL e poder ser copiado.
 
-   Natureza, centro de custo e fornecedor sao input + datalist, e nao select:
-   com 33 fornecedores, um combo obriga a rolar a lista atras do nome. O
-   datalist filtra enquanto se digita, e nao custa biblioteca nenhuma. Quem
-   digita so um pedaco tambem acha — a resolucao esta em consulta.py. #}
-<form class="filtros" method="get" action="{{ acao }}"
-      {% if htmx %}hx-get="{{ acao }}" hx-target="#resultado" hx-push-url="true"
-                   hx-trigger="submit, change from:select, change from:input[type=checkbox]"{% endif %}>
+   Os três campos múltiplos saem como input + datalist; o filtros.js troca cada
+   um por uma lista com busca e caixas de marcar. Sem JS, o datalist funciona. #}
+{% set campos_do_filtro = ['campo_data', 'inicio', 'fim', 'centro', 'natureza', 'fornecedor', 'busca',
+                           'documento', 'referencia', 'valor_minimo', 'valor_maximo', 'divergentes',
+                           'pagina'] + (['agrupar'] if agrupavel else []) %}
+{% set mais_aberto = filtro.documento or termo('referencia') or filtro.valor_minimo is not none
+                     or filtro.valor_maximo is not none or (agrupavel and agrupamento) %}
+<form class="filtros" method="get" action="{{ acao }}" data-filtros
+      {% if htmx %}hx-get="{{ acao }}" hx-target="#resultado" hx-push-url="true" hx-trigger="submit"{% endif %}>
 
-  <div class="campo campo-data">
-    <label for="campo_data">Data</label>
-    <select id="campo_data" name="campo_data">
-      <option value="data_baixa" {% if filtro.campo_data == 'data_baixa' %}selected{% endif %}>Baixa</option>
-      <option value="data_emissao" {% if filtro.campo_data == 'data_emissao' %}selected{% endif %}>Emissão</option>
-    </select>
-  </div>
-
-  <div class="campo campo-data">
-    <label for="inicio">De</label>
-    <input type="date" id="inicio" name="inicio"
-           value="{{ filtro.inicio.isoformat() if filtro.inicio else '' }}">
-  </div>
-
-  <div class="campo campo-data">
-    <label for="fim">Até</label>
-    <input type="date" id="fim" name="fim"
-           value="{{ filtro.fim.isoformat() if filtro.fim else '' }}">
-  </div>
-
-  {# Cada escolhido vira um hidden próprio: é o que `args.getlist` enxerga. #}
-  {% for campo, rotulo, vazio, lista in [
-       ('centro', 'Centro de custo', 'todos', opcoes.centros),
-       ('natureza', 'Natureza', 'todas', opcoes.naturezas),
-       ('fornecedor', 'Fornecedor', 'todos', opcoes.fornecedores)] %}
-    <div class="campo campo-multi {{ 'campo-curto' if campo == 'centro' else 'campo-medio' }}"
-         data-multi="{{ campo }}">
-      <label for="{{ campo }}-busca">{{ rotulo }}</label>
-      <div class="escolhidos" data-escolhidos>
-        {% for valor in selecionados(campo) %}
-          <span class="chip-escolhido">
-            <span>{{ valor }}</span>
-            <input type="hidden" name="{{ campo }}" value="{{ valor }}">
-            <button type="button" class="tirar-escolhido" data-tirar-escolhido
-                    aria-label="Tirar {{ valor }}">×</button>
-          </span>
-        {% endfor %}
-      </div>
-      <input type="search" id="{{ campo }}-busca" list="opcoes-{{ campo }}"
-             placeholder="{{ vazio }}" autocomplete="off" data-adicionar>
-      <datalist id="opcoes-{{ campo }}">
-        {% for item in lista %}<option value="{{ item }}">{% endfor %}
-      </datalist>
+  <div class="filtros-linha">
+    <div class="campo campo-data">
+      <label for="campo_data">Data</label>
+      <select id="campo_data" name="campo_data">
+        <option value="data_baixa" {% if filtro.campo_data == 'data_baixa' %}selected{% endif %}>Baixa</option>
+        <option value="data_emissao" {% if filtro.campo_data == 'data_emissao' %}selected{% endif %}>Emissão</option>
+      </select>
     </div>
-  {% endfor %}
 
-  <div class="campo campo-largo">
-    <label for="busca">Buscar</label>
-    <input type="search" id="busca" name="busca" value="{{ filtro.busca }}"
-           placeholder="referência, histórico, documento ou fornecedor" autocomplete="off">
+    <div class="campo campo-data">
+      <label for="inicio">De</label>
+      <input type="date" id="inicio" name="inicio"
+             value="{{ filtro.inicio.isoformat() if filtro.inicio else '' }}"
+             {% if filtro.fim %}max="{{ filtro.fim.isoformat() }}"{% endif %}>
+    </div>
+
+    <div class="campo campo-data">
+      <label for="fim">Até</label>
+      <input type="date" id="fim" name="fim"
+             value="{{ filtro.fim.isoformat() if filtro.fim else '' }}"
+             {% if filtro.inicio %}min="{{ filtro.inicio.isoformat() }}"{% endif %}>
+    </div>
+
+    {# Cada escolhido vira um hidden próprio: é o que `args.getlist` enxerga. #}
+    {% for campo, rotulo, vazio, lista in [
+         ('centro', 'Centro de custo', 'Todos', opcoes.centros),
+         ('natureza', 'Natureza', 'Todas', opcoes.naturezas),
+         ('fornecedor', 'Fornecedor', 'Todos', opcoes.fornecedores)] %}
+      <div class="campo campo-multi" data-multi="{{ campo }}" data-todos="{{ vazio }}">
+        <label for="{{ campo }}-busca">{{ rotulo }}</label>
+        <div class="escolhidos" data-escolhidos>
+          {% for valor in selecionados(campo) %}
+            <span class="chip-escolhido">
+              <span>{{ valor }}</span>
+              <input type="hidden" name="{{ campo }}" value="{{ valor }}">
+              <button type="button" class="tirar-escolhido" data-tirar-escolhido
+                      aria-label="Tirar {{ valor }}">×</button>
+            </span>
+          {% endfor %}
+        </div>
+        <input type="search" id="{{ campo }}-busca" list="opcoes-{{ campo }}"
+               placeholder="{{ vazio | lower }}" autocomplete="off" data-adicionar>
+        <datalist id="opcoes-{{ campo }}">
+          {% for item in lista %}<option value="{{ item }}">{% endfor %}
+        </datalist>
+      </div>
+    {% endfor %}
+
+    <div class="campo campo-largo">
+      <label for="busca">Buscar</label>
+      <input type="search" id="busca" name="busca" value="{{ filtro.busca }}"
+             placeholder="referência, histórico, documento ou fornecedor" autocomplete="off">
+    </div>
   </div>
 
-  {% if detalhado %}
+  <div class="filtros-linha filtros-mais{{ ' aberta' if mais_aberto }}" id="filtros-mais-{{ secao }}">
     <div class="campo campo-curto">
       <label for="documento">Documento</label>
       <input type="search" id="documento" name="documento" value="{{ filtro.documento }}"
@@ -76,40 +81,61 @@
 
     <div class="campo campo-curto">
       <label for="valor_minimo">Valor de</label>
-      <input type="text" id="valor_minimo" name="valor_minimo" inputmode="decimal"
-             value="{{ filtro.valor_minimo or '' }}">
+      <input type="text" id="valor_minimo" name="valor_minimo" inputmode="decimal" placeholder="0,00"
+             value="{{ filtro.valor_minimo if filtro.valor_minimo is not none else '' }}">
     </div>
 
     <div class="campo campo-curto">
       <label for="valor_maximo">Valor até</label>
-      <input type="text" id="valor_maximo" name="valor_maximo" inputmode="decimal"
-             value="{{ filtro.valor_maximo or '' }}">
+      <input type="text" id="valor_maximo" name="valor_maximo" inputmode="decimal" placeholder="0,00"
+             value="{{ filtro.valor_maximo if filtro.valor_maximo is not none else '' }}">
     </div>
 
-    <div class="campo campo-curto">
-      <label for="agrupar">Agrupar por</label>
-      <select id="agrupar" name="agrupar">
-        <option value="">nenhum</option>
-        {% for chave, rotulo in [('natureza','Natureza'), ('fornecedor','Fornecedor'),
-                                 ('centro','Centro de custo'), ('ano','Ano'),
-                                 ('mes','Mês'), ('dia','Dia')] %}
-          <option value="{{ chave }}" {% if agrupamento == chave %}selected{% endif %}>{{ rotulo }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  {% endif %}
-
-  <div class="campo">
-    <label for="divergentes">&nbsp;</label>
-    <label class="selo">
-      <input type="checkbox" id="divergentes" name="divergentes" value="1"
-             {% if filtro.somente_divergentes %}checked{% endif %}>
-      só divergentes
-    </label>
+    {% if agrupavel %}
+      <div class="campo campo-curto">
+        <label for="agrupar">Agrupar por</label>
+        <select id="agrupar" name="agrupar">
+          <option value="">nenhum</option>
+          {% for chave, rotulo in [('natureza','Natureza'), ('fornecedor','Fornecedor'),
+                                   ('centro','Centro de custo'), ('ano','Ano'),
+                                   ('mes','Mês'), ('dia','Dia')] %}
+            <option value="{{ chave }}" {% if agrupamento == chave %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
   </div>
 
-  <div class="campo acoes-filtro">
-    <button type="submit" class="botao-principal">Filtrar</button>
-    <a class="botao" href="{{ acao }}">Limpar</a>
+  {# O que não é filtro (visão do gráfico, ordem, agrupamento do relatório) segue junto. #}
+  {% for chave, valores in request.args.lists() if chave not in campos_do_filtro %}
+    {% for valor in valores if valor %}
+      <input type="hidden" name="{{ chave }}" value="{{ valor }}">
+    {% endfor %}
+  {% endfor %}
+
+  <div class="filtros-rodape">
+    {% if atalhos %}
+      <nav class="atalhos" aria-label="Períodos rápidos">
+        {% for atalho in atalhos %}
+          <a class="atalho" href="{{ url_for(request.endpoint, **atalho.args) }}"
+             {% if atalho.ativo %}aria-current="true"{% endif %}>{{ atalho.rotulo }}</a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+
+    <label class="interruptor">
+      <input type="checkbox" id="divergentes" name="divergentes" value="1"
+             {% if filtro.somente_divergentes %}checked{% endif %}>
+      Só divergentes
+    </label>
+
+    <button type="button" class="botao-fantasma" data-alternar-mais
+            aria-controls="filtros-mais-{{ secao }}" aria-expanded="{{ 'true' if mais_aberto else 'false' }}">
+      {{ 'Menos filtros' if mais_aberto else 'Mais filtros' }}
+    </button>
+
+    <span class="espaco"></span>
+    <button type="submit" class="botao-principal so-sem-js">Filtrar</button>
+    <a class="botao" href="{{ acao }}">Limpar filtros</a>
   </div>
 </form>

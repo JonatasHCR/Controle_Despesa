@@ -14,7 +14,7 @@
     </div>
   </div>
 
-  {% with acao = url_for('despesas.lista'), detalhado = true, htmx = true %}
+  {% with acao = url_for('despesas.lista'), agrupavel = true, htmx = true %}
     {% include 'despesas/_filtros.html' %}
   {% endwith %}
 

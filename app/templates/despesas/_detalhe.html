@@ -1,0 +1,59 @@
+{% set ACOES = {'despesa.criar': 'criada', 'despesa.editar': 'editada',
+                'despesa.divergencia': 'comparação alterada', 'despesa.excluir': 'excluída'} %}
+<header class="gaveta-topo">
+  <h2>Lançamento <span class="num">{{ despesa.referencia }}</span></h2>
+  <button type="button" class="botao-icone" data-fechar-gaveta aria-label="Fechar">✕</button>
+</header>
+
+<div class="gaveta-corpo">
+  <div class="gaveta-valor">
+    <span class="num">{{ despesa.valor_baixado | moeda }}</span>
+    {% include 'despesas/_situacao.html' %}
+  </div>
+
+  <dl class="ficha">
+    <dt>Fornecedor</dt><dd>{{ despesa.fornecedor.nome }}</dd>
+    <dt>Natureza</dt><dd>{{ despesa.natureza.nome }}</dd>
+    <dt>Centro de custo</dt>
+    <dd>{{ despesa.centro_custo.codigo }}{% if despesa.centro_custo.nome != despesa.centro_custo.codigo %} · {{ despesa.centro_custo.nome }}{% endif %}</dd>
+    <dt>Documento</dt><dd class="num">{{ despesa.documento or '—' }}</dd>
+    <dt>Histórico</dt><dd>{{ despesa.historico or '—' }}</dd>
+    <dt>Emissão</dt><dd class="num">{{ despesa.data_emissao | data }}</dd>
+    <dt>Baixa</dt><dd class="num">{{ despesa.data_baixa | data }}</dd>
+    <dt>Valor original</dt><dd class="num">{{ despesa.valor_original | moeda }}</dd>
+    <dt>Valor baixado</dt><dd class="num">{{ despesa.valor_baixado | moeda }}</dd>
+  </dl>
+
+  <div>
+    <div class="etiqueta">Histórico de alterações</div>
+    <ul class="historico">
+      {% for entrada, nome in historico %}
+        <li>
+          {{ ACOES.get(entrada.acao, entrada.acao) | capitalize }}
+          <small>{{ nome or 'sistema' }} · {{ entrada.criado_em | data }} {{ entrada.criado_em.strftime('%H:%M') }}</small>
+        </li>
+      {% else %}
+        <li>Sem alterações registradas desde a importação.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+{% if usuario.pode_escrever %}
+  <footer class="gaveta-pe">
+    {% if despesa.divergente or (despesa.divergencia_ignorada and despesa.diverge_nos_valores) %}
+      <form method="post" action="{{ url_for('despesas.alternar_divergencia', identificador=despesa.id, **query_base) }}">
+        {{ form_csrf() }}
+        <button type="submit" class="botao botao-mini">
+          {{ 'Aceitar diferença' if despesa.divergente else 'Voltar a comparar' }}
+        </button>
+      </form>
+    {% endif %}
+    <form method="post" action="{{ url_for('despesas.excluir', identificador=despesa.id, **query_base) }}"
+          data-confirmar="Excluir a despesa {{ despesa.referencia }} — {{ despesa.fornecedor.nome }}, {{ despesa.valor_baixado | moeda }}? A ação fica registrada na auditoria.">
+      {{ form_csrf() }}
+      <button type="submit" class="botao botao-mini botao-excluir">Excluir</button>
+    </form>
+    <a class="botao botao-mini botao-principal" href="{{ url_for('despesas.editar', identificador=despesa.id) }}">Editar</a>
+  </footer>
+{% endif %}

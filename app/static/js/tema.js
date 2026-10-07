@@ -5,6 +5,9 @@
  * nessa rede, nao ha motivo para abrir 'unsafe-inline'.
  */
 (function () {
+  // Marca que o JS roda: o CSS esconde o que so serve sem ele (botao Filtrar).
+  document.documentElement.classList.add('js');
+
   var CHAVE = 'tema';
   var ORDEM = ['sistema', 'claro', 'escuro'];
   var ICONE = { sistema: '◐', claro: '☀', escuro: '☾' };

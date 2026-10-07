@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
 {% block titulo %}Painel · Controle de Despesa{% endblock %}
 
+{% block scripts %}
+  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/graficos.js') }}" defer></script>
+{% endblock %}
+
 {% block conteudo %}
   <div class="cabecalho-pagina">
     <div>
@@ -12,7 +17,7 @@
       {% endif %}
     </div>
     <div class="acoes">
-      <a class="botao" href="{{ url_for('despesas.lista', **request.args) }}">Ver lançamentos</a>
+      <a class="botao" href="{{ url_for('despesas.lista', **query_completa) }}">Ver lançamentos</a>
       <a class="botao" href="{{ url_for('relatorios.montar', **query_completa) }}">Relatório</a>
       {% if usuario.pode_escrever %}
         <a class="botao botao-principal" href="{{ url_for('despesas.nova') }}">Nova despesa</a>
@@ -20,14 +25,10 @@
     </div>
   </div>
 
-  {% with acao = url_for('despesas.painel'), detalhado = false, htmx = false %}
+  {% with acao = url_for('despesas.painel'), agrupavel = false, htmx = false %}
     {% include 'despesas/_filtros.html' %}
   {% endwith %}
 
-  {#
-    O total domina; lançamentos, fornecedores e meses são contexto dele. Quatro
-    números do mesmo tamanho não dizem qual é o assunto da tela.
-  #}
   <section class="resumo-topo">
     <div class="cartao bloco-total">
       <div>
@@ -51,10 +52,13 @@
           <div class="valor num">{{ meses | numero }}</div>
           <div class="rotulo">{{ 'mês' if meses == 1 else 'meses' }}</div>
         </div>
+        <div>
+          <div class="valor num">{{ media_mensal | moeda if media_mensal is not none else '—' }}</div>
+          <div class="rotulo">média por mês</div>
+        </div>
       </div>
     </div>
 
-    {# A divergência é a única coisa da tela que pede ação: não é o quarto tile. #}
     {% if resumo.divergentes %}
       <div class="bloco-divergencia">
         <div class="cabeca">
@@ -65,7 +69,7 @@
               lançamento{{ 's' if resumo.divergentes != 1 }} divergente{{ 's' if resumo.divergentes != 1 }}
             </div>
             <p>
-              O valor baixado não coincide com o original.
+              O valor baixado não coincide com o original. Confira e aceite a diferença ou corrija o lançamento.
               {% if fornecedor_divergente %}
                 {{ 'Todos' if resumo.divergentes != 1 else 'É' }} da
                 <strong>{{ fornecedor_divergente }}</strong>.
@@ -107,45 +111,43 @@
   </section>
 
   {% macro campos_ocultos(exceto) %}
-    {% for chave, valores in query_completa.items() %}
-      {% if chave != exceto %}
-        {% for valor in valores %}
-          <input type="hidden" name="{{ chave }}" value="{{ valor }}">
-        {% endfor %}
-      {% endif %}
+    {% for chave, valores in query_completa.items() if chave not in exceto %}
+      {% for valor in valores %}
+        <input type="hidden" name="{{ chave }}" value="{{ valor }}">
+      {% endfor %}
     {% endfor %}
   {% endmacro %}
 
+  <script type="application/json" id="dados-graficos">{{ grafico | tojson }}</script>
+
   <section class="graficos">
-    <div class="cartao">
+    <div class="cartao grafico">
       <div class="cartao-topo">
-        <h2>Despesa por natureza{% if rotulo %} · {{ rotulo }}{% endif %}</h2>
+        <h2>Despesa por natureza{% if rotulo %} · {{ rotulo }}{% endif %}
+          <span class="dica">clique numa barra para filtrar</span></h2>
         <form method="get" action="{{ url_for('despesas.painel') }}" class="escolha-do-grafico">
-          {{ campos_ocultos('ordem_natureza') }}
+          {{ campos_ocultos(['ordem_natureza']) }}
           <label class="oculto" for="ordem-natureza">Ordenar naturezas</label>
           <select id="ordem-natureza" name="ordem_natureza" data-enviar-ao-mudar>
             {% for chave, texto in ordens_da_natureza.items() %}
               <option value="{{ chave }}" {% if chave == ordem_natureza %}selected{% endif %}>{{ texto }}</option>
             {% endfor %}
           </select>
-          <noscript><button type="submit" class="botao botao-mini">Ver</button></noscript>
         </form>
       </div>
-      {{ grafico_natureza }}
+      {% if grafico.natureza %}
+        <div class="tela-grafico" data-grafico="natureza"><canvas aria-label="Despesa por natureza"></canvas></div>
+      {% else %}
+        <p class="gr-vazio">Sem dados para o filtro atual.</p>
+      {% endif %}
     </div>
 
-    <div class="cartao">
+    <div class="cartao grafico">
       <div class="cartao-topo">
-        <h2>Despesa por {{ visoes[ver] }}{% if rotulo %} · {{ rotulo }}{% endif %}</h2>
+        <h2>Despesa por {{ visoes[ver] }}{% if rotulo %} · {{ rotulo }}{% endif %}
+          {% if ver != 'dia' %}<span class="dica">clique para filtrar o período</span>{% endif %}</h2>
         <form method="get" action="{{ url_for('despesas.painel') }}" class="escolha-do-grafico">
-          {% for chave, valores in query_completa.items() %}
-            {% if chave not in ('ver', 'ano', 'dia') %}
-              {% for valor in valores %}
-                <input type="hidden" name="{{ chave }}" value="{{ valor }}">
-              {% endfor %}
-            {% endif %}
-          {% endfor %}
-
+          {{ campos_ocultos(['ver', 'ano', 'dia']) }}
           <label class="oculto" for="ver">Agrupar o tempo por</label>
           <select id="ver" name="ver" data-enviar-ao-mudar>
             {% for chave, texto in visoes.items() %}
@@ -166,12 +168,90 @@
                    data-enviar-ao-mudar>
           {% endif %}
 
-          <noscript><button type="submit" class="botao botao-mini">Ver</button></noscript>
+          <label class="oculto" for="modo-tempo">Valor no período ou acumulado</label>
+          <select id="modo-tempo" data-modo-tempo>
+            <option value="periodo">no período</option>
+            <option value="acumulado">acumulado</option>
+          </select>
         </form>
       </div>
-      {{ grafico_mes }}
+      {% if grafico.tempo %}
+        <div class="tela-grafico" data-grafico="tempo" data-ver="{{ ver }}"><canvas aria-label="Despesa no tempo"></canvas></div>
+      {% else %}
+        <p class="gr-vazio">Sem dados para o filtro atual.</p>
+      {% endif %}
     </div>
   </section>
 
-  {% include 'despesas/_resultado.html' %}
+  {% macro ranking(itens, vazio) %}
+    {% if itens %}
+      <ul class="ranking">
+        {% for item in itens %}
+          <li>
+            <a href="{{ url_for('despesas.painel', **item.args) }}" {% if item.escolhido %}aria-current="true"{% endif %}
+               title="{{ 'Tirar o filtro' if item.escolhido else 'Filtrar por' }} {{ item.rotulo }}">
+              <span class="nome">{{ item.rotulo }}</span>
+              <span class="valor num">{{ item.total | moeda }}</span>
+              <svg class="barra" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
+                <rect class="trilho" width="100" height="4" rx="2"></rect>
+                <rect class="cheio" width="{{ item.largura }}" height="4" rx="2"></rect>
+              </svg>
+              <span class="detalhe">{{ item.quantidade | numero }} lançamento{{ 's' if item.quantidade != 1 }}
+                · {{ '%.1f' | format(item.fatia) | replace('.', ',') }}%</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="gr-vazio">{{ vazio }}</p>
+    {% endif %}
+  {% endmacro %}
+
+  <section class="graficos graficos-iguais">
+    <div class="cartao">
+      <div class="cartao-topo">
+        <h2>Por centro de custo</h2>
+        <span class="legenda-cartao">{{ ranking_centros | length }} centro{{ 's' if ranking_centros | length != 1 }}</span>
+      </div>
+      {{ ranking(ranking_centros, 'Sem dados para o filtro atual.') }}
+    </div>
+    <div class="cartao">
+      <div class="cartao-topo">
+        <h2>Maiores fornecedores</h2>
+        <span class="legenda-cartao">os 8 maiores</span>
+      </div>
+      {{ ranking(ranking_fornecedores, 'Sem dados para o filtro atual.') }}
+    </div>
+  </section>
+
+  <div class="cartao">
+    <div class="cartao-topo">
+      <h2>Últimos lançamentos</h2>
+      <a class="botao botao-mini" href="{{ url_for('despesas.lista', **query_completa) }}">
+        Ver todos os {{ resumo.lancamentos | numero }}</a>
+    </div>
+    <div class="rolagem">
+      <table class="lancamentos compacta">
+        <thead>
+          <tr><th>Baixa</th><th>Fornecedor</th><th>Natureza</th><th>CC</th>
+              <th class="numero">Baixado</th><th class="numero">Situação</th></tr>
+        </thead>
+        <tbody>
+          {% for despesa in ultimos %}
+            <tr {% if despesa.divergente %}class="linha-divergente"{% endif %}
+                data-detalhe="{{ url_for('despesas.detalhe', identificador=despesa.id) }}">
+              <td>{{ despesa.data_baixa | data }}</td>
+              <td class="corta" title="{{ despesa.fornecedor.nome }}">{{ despesa.fornecedor.nome }}</td>
+              <td class="corta" title="{{ despesa.natureza.nome }}">{{ despesa.natureza.nome }}</td>
+              <td>{{ despesa.centro_custo.codigo }}</td>
+              <td class="numero forte">{{ despesa.valor_baixado | moeda }}</td>
+              <td class="numero c-situacao">{% include 'despesas/_situacao.html' %}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="vazio">Nenhuma despesa para este filtro.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 {% endblock %}
