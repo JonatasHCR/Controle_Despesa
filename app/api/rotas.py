@@ -9,7 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from flask import Blueprint, jsonify, request
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 
 from app.api.token import requer_token
 from app.extensions import csrf, db, limiter
@@ -42,6 +42,32 @@ def _desde(param: str) -> datetime | None:
         return None
 
 
+def _so_dos_centros(consulta):
+    """`centro_ids=1,5,9`: o Controle Financeiro só quer os CRs que têm contrato na Receita."""
+    texto = request.args.get("centro_ids")
+    if texto is None:
+        return consulta
+    ids = [int(parte) for parte in texto.split(",") if parte.strip().isdigit()]
+    return consulta.where(Despesa.centro_custo_id.in_(ids))
+
+
+def _depois_de(consulta, coluna_marca, coluna_id, param_marca: str):
+    """Pagina pela última linha lida: marca maior, ou marca igual e id maior.
+
+    Com offset, uma linha alterada no meio da leitura muda de posição e outra
+    fica de fora; com o cursor, não.
+    """
+    marca = _desde(param_marca)
+    if marca is None:
+        return consulta
+    depois_do_id = request.args.get("after_id", type=int)
+    if depois_do_id is None:
+        return consulta.where(coluna_marca > marca)
+    return consulta.where(
+        or_(coluna_marca > marca, and_(coluna_marca == marca, coluna_id > depois_do_id))
+    )
+
+
 def _dinheiro(valor: Decimal | None) -> str | None:
     # texto para não perder centavos no JSON
     return None if valor is None else str(valor)
@@ -55,9 +81,9 @@ def _iso(valor) -> str | None:
 @requer_token
 def despesas():
     consulta = select(Despesa).order_by(Despesa.atualizado_em, Despesa.id)
-    marca = _desde("updated_since")
-    if marca is not None:
-        consulta = consulta.where(Despesa.atualizado_em > marca)
+    consulta = _so_dos_centros(
+        _depois_de(consulta, Despesa.atualizado_em, Despesa.id, "updated_since")
+    )
     limite = _limite()
     linhas = db.session.scalars(consulta.limit(limite).offset(_offset())).unique().all()
     return jsonify(
@@ -79,6 +105,7 @@ def despesas():
             for d in linhas
         ],
         watermark=_iso(linhas[-1].atualizado_em) if linhas else None,
+        last_id=linhas[-1].id if linhas else None,
         count=len(linhas),
         has_more=len(linhas) == limite,
     )
@@ -90,14 +117,15 @@ def exclusoes():
     consulta = select(DespesaExcluida).order_by(
         DespesaExcluida.excluida_em, DespesaExcluida.despesa_id
     )
-    marca = _desde("since")
-    if marca is not None:
-        consulta = consulta.where(DespesaExcluida.excluida_em > marca)
+    consulta = _depois_de(
+        consulta, DespesaExcluida.excluida_em, DespesaExcluida.despesa_id, "since"
+    )
     limite = _limite()
-    linhas = db.session.scalars(consulta.limit(limite)).all()
+    linhas = db.session.scalars(consulta.limit(limite).offset(_offset())).all()
     return jsonify(
         exclusoes=[{"id": x.despesa_id, "excluida_em": _iso(x.excluida_em)} for x in linhas],
         watermark=_iso(linhas[-1].excluida_em) if linhas else None,
+        last_id=linhas[-1].despesa_id if linhas else None,
         count=len(linhas),
         has_more=len(linhas) == limite,
     )
@@ -107,7 +135,8 @@ def exclusoes():
 @requer_token
 def ids():
     """Todos os ids existentes, para o Controle Financeiro apagar o que sobrou na cópia."""
-    return jsonify(ids=db.session.scalars(select(Despesa.id).order_by(Despesa.id)).all())
+    consulta = _so_dos_centros(select(Despesa.id).order_by(Despesa.id))
+    return jsonify(ids=db.session.scalars(consulta).all())
 
 
 def _dominio(modelo, extras=lambda _x: {}):
@@ -137,11 +166,13 @@ def naturezas():
 @requer_token
 def status():
     contagem, maior, soma, maior_id = db.session.execute(
-        select(
-            func.count(Despesa.id),
-            func.max(Despesa.atualizado_em),
-            func.coalesce(func.sum(Despesa.valor_baixado), 0),
-            func.max(Despesa.id),
+        _so_dos_centros(
+            select(
+                func.count(Despesa.id),
+                func.max(Despesa.atualizado_em),
+                func.coalesce(func.sum(Despesa.valor_baixado), 0),
+                func.max(Despesa.id),
+            )
         )
     ).one()
     return jsonify(

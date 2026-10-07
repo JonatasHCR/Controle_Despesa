@@ -145,3 +145,58 @@ def test_ids_listam_so_o_que_existe(api, carregado, db):
     ids = api.get("/api/v1/despesas/ids", headers=CABECALHO).get_json()["ids"]
     assert despesa_id not in ids
     assert len(ids) == db.session.query(Despesa).count()
+
+
+# --- paginação pela última linha lida ---------------------------------------
+
+
+def _ler_tudo(api, rota, chave, marca, limite):
+    """Como o Controle Financeiro lê: segue watermark + last_id até has_more=false."""
+    vistos, consulta = [], {"limit": limite}
+    for _ in range(1000):
+        corpo = api.get(rota, query_string=consulta, headers=CABECALHO).get_json()
+        vistos += [item["id"] for item in corpo[chave]]
+        if not corpo["has_more"]:
+            return vistos
+        consulta = {"limit": limite, marca: corpo["watermark"], "after_id": corpo["last_id"]}
+    raise AssertionError("a paginação não terminou")
+
+
+def test_cursor_cobre_tudo_mesmo_com_a_mesma_marca(api, carregado, db):
+    """A importação grava todas com o mesmo atualizado_em: o id desempata."""
+    total = db.session.query(Despesa).count()
+    vistos = _ler_tudo(api, "/api/v1/despesas", "despesas", "updated_since", 40)
+    assert len(vistos) == total == len(set(vistos))
+
+
+def test_exclusoes_paginam_alem_do_limite(api, carregado, db):
+    """Antes, /exclusoes ignorava a paginação e devolvia sempre a primeira página."""
+    ids = set(db.session.scalars(select(Despesa.id)).all())
+    limpar(db.session, "despesas")
+    db.session.commit()
+    vistos = _ler_tudo(api, "/api/v1/despesas/exclusoes", "exclusoes", "since", 25)
+    assert set(vistos) == ids and len(vistos) == len(ids)
+
+    segunda = api.get(
+        "/api/v1/despesas/exclusoes?limit=25&offset=25", headers=CABECALHO
+    ).get_json()["exclusoes"]
+    primeira = api.get("/api/v1/despesas/exclusoes?limit=25", headers=CABECALHO).get_json()
+    assert not {x["id"] for x in segunda} & {x["id"] for x in primeira["exclusoes"]}
+
+
+def test_filtro_por_centro_vale_para_lista_ids_e_status(api, carregado, db):
+    centro = db.session.scalars(select(Despesa.centro_custo_id)).first()
+    esperado = db.session.query(Despesa).filter(Despesa.centro_custo_id == centro).count()
+    consulta = {"centro_ids": f"{centro},999999"}
+
+    lista = api.get("/api/v1/despesas", query_string=consulta, headers=CABECALHO).get_json()
+    ids = api.get("/api/v1/despesas/ids", query_string=consulta, headers=CABECALHO).get_json()
+    status = api.get("/api/v1/status", query_string=consulta, headers=CABECALHO).get_json()
+
+    assert {d["centro_custo_id"] for d in lista["despesas"]} == {centro}
+    assert len(ids["ids"]) == status["despesas"]["count"] == esperado
+
+
+def test_lista_vazia_de_centros_nao_traz_nada(api, carregado):
+    corpo = api.get("/api/v1/despesas?centro_ids=", headers=CABECALHO).get_json()
+    assert corpo["despesas"] == []
