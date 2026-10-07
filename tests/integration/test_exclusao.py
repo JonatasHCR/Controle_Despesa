@@ -67,7 +67,7 @@ def test_a_lista_oferece_excluir(entrar, operador, carregado):
 def test_cada_linha_tem_editar_e_excluir(entrar, operador, carregado):
     corpo = entrar(operador).get("/despesas?referencia=136914").get_data(as_text=True)
     assert corpo.count("/editar") >= 1
-    assert corpo.count("/excluir") == 1
+    assert len(re.findall(r"/despesas/\d+/excluir", corpo)) == 1
 
 
 def test_leitor_nao_ve_a_acao_de_excluir(entrar, leitor, carregado):
