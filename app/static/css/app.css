@@ -1472,3 +1472,13 @@ dialog.janela-exportar { width: min(520px, calc(100vw - 32px)); border-radius: v
 .area-nome { font-size: 12.5px; color: var(--muted); }
 .area-arquivo input[type='file'] { max-width: 100%; }
 .js .area-arquivo input[type='file'] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+/* --- selos coloridos (auditoria, backups, perfis) --------------------------- */
+
+.selo.ok { background: var(--sucesso-soft); color: var(--sucesso); }
+.selo.aviso { background: var(--aviso-soft); color: var(--aviso); }
+.selo.perigo, .selo.destaque { background: var(--brand-soft); color: var(--brand); }
+.selo.info { background: var(--sunken); color: var(--viz-serie); }
+table.auditoria td { vertical-align: top; }
+table.auditoria td.livre .selo { margin: 0 4px 4px 0; max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
+.botao-perigo:disabled { opacity: .45; cursor: not-allowed; }

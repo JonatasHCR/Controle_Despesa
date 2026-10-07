@@ -315,8 +315,8 @@ def test_auditoria_filtra_por_acao(entrar, admin, db):
     corpo = entrar(admin).get("/auditoria/?acao=despesa.criar").get_data(as_text=True)
     # A celula da tabela, e nao a pagina toda: o combo de filtro lista as duas
     # acoes de qualquer jeito.
-    assert "<td>despesa.criar</td>" in corpo
-    assert "<td>despesa.excluir</td>" not in corpo
+    assert 'title="despesa.criar"' in corpo
+    assert 'title="despesa.excluir"' not in corpo
 
 
 # --- XSS refletido ----------------------------------------------------------
@@ -408,3 +408,48 @@ def test_limpeza_por_fornecedor_e_valor_apaga_so_o_recorte(entrar, admin, carreg
         data={"alvo": "despesas", "fornecedor": nome, "confirmacao": "LIMPAR"},
     )
     assert db.session.scalar(select(func.count(Despesa.id))) == antes - do_fornecedor
+
+
+def test_recorte_nao_cita_campo_vazio(entrar, admin, carregado):
+    corpo = (
+        entrar(admin)
+        .post(
+            "/administracao/contagem",
+            data={"alvo": "despesas", "natureza": "COMBUSTIVEL", "referencia": "", "documento": ""},
+        )
+        .get_data(as_text=True)
+    )
+    assert "referência" not in corpo
+
+
+def test_auditoria_mostra_a_acao_como_selo_e_busca_nos_detalhes(entrar, admin, db):
+    from app.auditoria.servico import registrar
+
+    registrar(
+        db.session,
+        acao="despesa.excluir",
+        usuario=admin,
+        alvo_tipo="despesa",
+        alvo_id=7,
+        payload={"referencia": 136914},
+    )
+    registrar(
+        db.session,
+        acao="manutencao.backup",
+        usuario=admin,
+        alvo_tipo="backup",
+        payload={"arquivo": "x.sql"},
+    )
+    db.session.commit()
+    cliente = entrar(admin)
+    corpo = cliente.get("/auditoria/").get_data(as_text=True)
+    assert 'class="selo perigo"' in corpo and "excluiu despesa" in corpo
+    achado = cliente.get("/auditoria/?busca=136914").get_data(as_text=True)
+    assert 'title="despesa.excluir"' in achado and 'title="manutencao.backup"' not in achado
+
+
+def test_backup_manual_e_automatico_se_distinguem(app):
+    from app.admin.manutencao import MANUAL
+
+    assert MANUAL.search("controle_despesa_20261007_142233.sql")
+    assert not MANUAL.search("controle_despesa_20261007_0300.sql")

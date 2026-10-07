@@ -155,7 +155,7 @@ def descrever(filtro, agrupamento: str | None) -> str:
         partes.append("fornecedor " + ", ".join(filtro.fornecedores))
     if filtro.documento:
         partes.append(f"documento contendo “{filtro.documento}”")
-    if filtro.referencia is not None:
+    if filtro.referencia not in (None, ""):
         partes.append(f"referência {filtro.referencia}")
     if filtro.busca:
         partes.append(f"busca “{filtro.busca}”")

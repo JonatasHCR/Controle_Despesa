@@ -57,6 +57,9 @@ def _conexao() -> dict:
     }
 
 
+MANUAL = re.compile(r"_\d{8}_\d{6}\.sql$")
+
+
 def diretorio() -> Path:
     from flask import current_app
 
@@ -76,6 +79,8 @@ def listar_backups() -> list[dict]:
                 "nome": arquivo.name,
                 "bytes": info.st_size,
                 "criado_em": datetime.fromtimestamp(info.st_mtime),
+                # O botão grava com segundos no nome; o sidecar, sem.
+                "origem": "manual" if MANUAL.search(arquivo.name) else "automático",
             }
         )
     return sorted(arquivos, key=lambda item: item["criado_em"], reverse=True)

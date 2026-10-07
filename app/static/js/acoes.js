@@ -17,6 +17,15 @@
     }
   });
 
+  // <input data-palavra="LIMPAR">: o botão perigoso do formulário só acende
+  // com a palavra exata. O servidor confere de novo.
+  document.addEventListener('input', function (evento) {
+    var campo = evento.target.closest('[data-palavra]');
+    if (!campo) return;
+    var botao = campo.closest('form').querySelector('[data-exige-palavra]');
+    if (botao) botao.disabled = campo.value.trim() !== campo.getAttribute('data-palavra');
+  });
+
   // <select data-ir-para> — cada <option value> é uma URL.
   document.addEventListener('change', function (evento) {
     var seletor = evento.target.closest('[data-ir-para]');

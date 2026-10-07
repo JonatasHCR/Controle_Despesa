@@ -1,49 +1,68 @@
 {% extends 'base.html' %}
 {% block titulo %}Auditoria · Controle de Despesa{% endblock %}
 
+{% macro valor_curto(valor) -%}
+  {%- if valor is mapping -%}{{ valor | length }} campo(s)
+  {%- elif valor is iterable and valor is not string -%}{{ valor | length }} item(ns)
+  {%- else -%}{{ (valor | string) | truncate(60, true, '…') }}{%- endif -%}
+{%- endmacro %}
+
 {% block conteudo %}
-  <h1>Auditoria</h1>
-  <p class="legenda-pagina">
-    Registro do que foi feito no sistema. A trilha só recebe entradas — nada aqui é
-    editado nem apagado pela aplicação.
-  </p>
+  <div class="cabecalho-pagina">
+    <div>
+      <h1>Auditoria</h1>
+      <p class="legenda-pagina sem-margem">
+        Registro do que foi feito no sistema. A trilha só recebe entradas — nada aqui é
+        editado nem apagado pela aplicação.
+      </p>
+    </div>
+  </div>
 
   <form class="filtros" method="get">
-    <div class="campo">
-      <label for="acao">Ação</label>
-      <select id="acao" name="acao">
-        <option value="">todas</option>
-        {% for item in acoes %}
-          <option value="{{ item }}" {% if filtro_acao == item %}selected{% endif %}>{{ item }}</option>
-        {% endfor %}
-      </select>
+    <div class="filtros-linha">
+      <div class="campo campo-medio">
+        <label for="acao">Ação</label>
+        <select id="acao" name="acao" data-enviar-ao-mudar>
+          <option value="">todas</option>
+          {% for item in acoes %}
+            <option value="{{ item }}" {% if filtro_acao == item %}selected{% endif %}>{{ rotulos.get(item, (item, ''))[0] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="campo campo-curto">
+        <label for="alvo_tipo">Alvo</label>
+        <select id="alvo_tipo" name="alvo_tipo" data-enviar-ao-mudar>
+          <option value="">todos</option>
+          {% for item in tipos %}
+            <option value="{{ item }}" {% if filtro_tipo == item %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="campo campo-medio">
+        <label for="usuario">Pessoa</label>
+        <select id="usuario" name="usuario" data-enviar-ao-mudar>
+          <option value="">todas</option>
+          {% for identificador, nome in pessoas.items() %}
+            <option value="{{ identificador }}"
+                    {% if filtro_usuario == identificador %}selected{% endif %}>{{ nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="campo campo-largo">
+        <label for="busca">Buscar nos detalhes</label>
+        <input type="search" id="busca" name="busca" value="{{ filtro_busca }}"
+               placeholder="referência, arquivo, valor, nº do alvo…" autocomplete="off">
+      </div>
+      <div class="campo acoes-filtro">
+        <button type="submit" class="botao-principal">Filtrar</button>
+        <a class="botao" href="{{ url_for('auditoria.lista') }}">Limpar</a>
+      </div>
     </div>
-    <div class="campo">
-      <label for="alvo_tipo">Alvo</label>
-      <select id="alvo_tipo" name="alvo_tipo">
-        <option value="">todos</option>
-        {% for item in tipos %}
-          <option value="{{ item }}" {% if filtro_tipo == item %}selected{% endif %}>{{ item }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="campo">
-      <label for="usuario">Pessoa</label>
-      <select id="usuario" name="usuario">
-        <option value="">todas</option>
-        {% for identificador, nome in pessoas.items() %}
-          <option value="{{ identificador }}"
-                  {% if filtro_usuario == identificador %}selected{% endif %}>{{ nome }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <button type="submit" class="botao-principal">Filtrar</button>
-    <a class="botao" href="{{ url_for('auditoria.lista') }}">Limpar</a>
   </form>
 
   <div class="cartao">
     <div class="rolagem">
-      <table>
+      <table class="auditoria">
         <thead>
           <tr>
             <th>Quando</th>
@@ -55,37 +74,57 @@
         </thead>
         <tbody>
           {% for entrada in pagina.items %}
+            {% set rotulo, cor = rotulos.get(entrada.acao, (entrada.acao, '')) %}
             <tr>
-              <td>{{ entrada.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td class="num">{{ entrada.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
               <td>{{ pessoas.get(entrada.usuario_id, '—') }}</td>
-              <td>{{ entrada.acao }}</td>
-              <td>{{ entrada.alvo_tipo }}{% if entrada.alvo_id %} #{{ entrada.alvo_id }}{% endif %}</td>
+              <td><span class="selo {{ cor }}" title="{{ entrada.acao }}">{{ rotulo }}</span></td>
+              <td>{{ entrada.alvo_tipo }}{% if entrada.alvo_id %} <span class="num">#{{ entrada.alvo_id }}</span>{% endif %}</td>
               <td class="livre">
                 {% if entrada.payload %}
-                  {% for chave, valor in entrada.payload.items() %}
-                    <span class="selo">{{ chave }}: {{ valor }}</span>
+                  {% set itens = [] %}
+                  {% for chave, valor in entrada.payload | dictsort if valor is not none and valor != '' %}
+                    {% set _ = itens.append((chave, valor)) %}
                   {% endfor %}
+                  {% for chave, valor in itens[:4] %}
+                    <span class="selo" title="{{ chave }}: {{ valor }}">{{ chave }}: {{ valor_curto(valor) }}</span>
+                  {% endfor %}
+                  {% if itens | length > 4 %}<span class="selo">+{{ itens | length - 4 }}</span>{% endif %}
                 {% endif %}
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="5" class="vazio">Nada registrado ainda.</td></tr>
+            <tr><td colspan="5" class="vazio">Nada registrado com esses filtros.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
 
-    {% if pagina.pages > 1 %}
-      <nav class="paginacao">
-        {% if pagina.has_prev %}
-          <a href="{{ url_for('auditoria.lista', pagina=pagina.prev_num, **query_base) }}">‹</a>
-        {% endif %}
-        <span class="atual">{{ pagina.page }}</span>
-        <span>de {{ pagina.pages }}</span>
-        {% if pagina.has_next %}
-          <a href="{{ url_for('auditoria.lista', pagina=pagina.next_num, **query_base) }}">›</a>
-        {% endif %}
-      </nav>
-    {% endif %}
+    <div class="rodape-tabela">
+      <span class="legenda-cartao">
+        {% if pagina.total %}{{ pagina.total | numero }} registro(s){% endif %}
+      </span>
+      {% if pagina.pages > 1 %}
+        <nav class="paginacao" aria-label="Paginação">
+          {% if pagina.has_prev %}
+            <a href="{{ url_for('auditoria.lista', pagina=pagina.prev_num, **query_base) }}" aria-label="Página anterior">‹</a>
+          {% endif %}
+          {% for numero in pagina.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if numero %}
+              {% if numero == pagina.page %}
+                <span class="atual" aria-current="page">{{ numero }}</span>
+              {% else %}
+                <a href="{{ url_for('auditoria.lista', pagina=numero, **query_base) }}">{{ numero }}</a>
+              {% endif %}
+            {% else %}
+              <span class="reticencias">…</span>
+            {% endif %}
+          {% endfor %}
+          {% if pagina.has_next %}
+            <a href="{{ url_for('auditoria.lista', pagina=pagina.next_num, **query_base) }}" aria-label="Próxima página">›</a>
+          {% endif %}
+        </nav>
+      {% endif %}
+    </div>
   </div>
 {% endblock %}

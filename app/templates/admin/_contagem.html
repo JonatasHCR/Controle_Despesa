@@ -1,8 +1,8 @@
 <div class="aviso {% if quantidade %}atencao{% endif %}">
   {% if quantidade %}
     <strong>{{ quantidade | numero }}</strong> registro(s) seriam apagados de <strong>{{ alvo }}</strong>{% if valor is not none %}, somando <strong>{{ valor | moeda }}</strong>{% endif %}.
-    {% if descricao %}<div class="legenda-cartao">{{ descricao }}</div>{% endif %}
   {% else %}
     Nenhum registro se encaixa nesse filtro.
   {% endif %}
+  {% if descricao %}<div class="legenda-cartao">{{ descricao }}</div>{% endif %}
 </div>

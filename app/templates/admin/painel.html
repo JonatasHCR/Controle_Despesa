@@ -19,21 +19,25 @@
     <div class="rolagem">
       <table>
         <thead>
-          <tr><th>Arquivo</th><th>Quando</th><th class="numero">Tamanho</th><th></th></tr>
+          <tr><th>Arquivo</th><th>Quando</th><th>Origem</th><th class="numero">Tamanho</th><th></th></tr>
         </thead>
         <tbody>
           {% for backup in backups %}
             <tr>
-              <td>{{ backup.nome }}</td>
-              <td>{{ backup.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
-              <td class="numero">{{ (backup.bytes / 1024) | round | int | numero }} KB</td>
+              <td class="num">{{ backup.nome }}</td>
+              <td class="num">{{ backup.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td><span class="selo {{ 'destaque' if backup.origem == 'manual' else '' }}">{{ backup.origem }}</span></td>
+              <td class="numero num">
+                {% if backup.bytes >= 1048576 %}{{ '%.1f' | format(backup.bytes / 1048576) | replace('.', ',') }} MB
+                {% else %}{{ (backup.bytes / 1024) | round | int | numero }} KB{% endif %}
+              </td>
               <td>
-                <a class="botao"
+                <a class="botao botao-mini"
                    href="{{ url_for('admin.baixar_backup', nome=backup.nome) }}">Baixar</a>
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="4" class="vazio">Nenhum backup ainda.</td></tr>
+            <tr><td colspan="5" class="vazio">Nenhum backup ainda.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -58,7 +62,7 @@
               <td>{{ pessoa.email }}</td>
               <td>
                 {% if pessoa.ativo %}
-                  <span class="selo">ativa</span>
+                  <span class="selo ok">ativa</span>
                 {% else %}
                   <span class="selo divergente">⚠ sem o grupo</span>
                 {% endif %}
@@ -68,13 +72,13 @@
                       action="{{ url_for('admin.mudar_perfil', identificador=pessoa.id) }}"
                       class="acoes">
                   {{ form_csrf() }}
-                  <select name="perfil" aria-label="Perfil de {{ pessoa.nome }}">
+                  <select name="perfil" aria-label="Perfil de {{ pessoa.nome }}" data-enviar-ao-mudar>
                     {% for perfil in perfis %}
                       <option value="{{ perfil }}"
                               {% if pessoa.perfil == perfil %}selected{% endif %}>{{ perfil }}</option>
                     {% endfor %}
                   </select>
-                  <button type="submit">Salvar</button>
+                  <button type="submit" class="botao-mini so-sem-js">Salvar</button>
                 </form>
               </td>
             </tr>
@@ -167,9 +171,10 @@
       <div class="filtros">
         <div class="campo">
           <label for="confirmacao-limpeza">Digite LIMPAR para confirmar</label>
-          <input type="text" id="confirmacao-limpeza" name="confirmacao" autocomplete="off">
+          <input type="text" id="confirmacao-limpeza" name="confirmacao" autocomplete="off"
+                 data-palavra="LIMPAR" placeholder="LIMPAR">
         </div>
-        <button type="submit" class="botao-perigo">Apagar</button>
+        <button type="submit" class="botao-perigo" data-exige-palavra disabled>Apagar</button>
       </div>
     </form>
   </div>
@@ -193,9 +198,10 @@
       </div>
       <div class="campo">
         <label for="confirmacao-restauracao">Digite RESTAURAR para confirmar</label>
-        <input type="text" id="confirmacao-restauracao" name="confirmacao" autocomplete="off">
+        <input type="text" id="confirmacao-restauracao" name="confirmacao" autocomplete="off"
+               data-palavra="RESTAURAR" placeholder="RESTAURAR">
       </div>
-      <button type="submit" class="botao-perigo" {% if not backups %}disabled{% endif %}>
+      <button type="submit" class="botao-perigo" data-exige-palavra disabled>
         Restaurar
       </button>
     </form>

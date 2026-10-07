@@ -3,15 +3,31 @@
 from __future__ import annotations
 
 from flask import Blueprint, render_template, request
-from sqlalchemy import select
+from sqlalchemy import String, cast, or_, select
 
 from app.auth.guardas import requer
+from app.despesas.filtros import curinga
 from app.extensions import db
 from app.models import Auditoria, Usuario
 
 bp = Blueprint("auditoria", __name__, url_prefix="/auditoria")
 
 POR_PAGINA = 60
+
+# Ação → (como aparece, cor do selo).
+ROTULOS = {
+    "despesa.criar": ("criou despesa", "ok"),
+    "despesa.editar": ("editou despesa", "aviso"),
+    "despesa.excluir": ("excluiu despesa", "perigo"),
+    "despesa.divergencia": ("mudou a comparação", "aviso"),
+    "importacao.gravar": ("importou planilha", "ok"),
+    "manutencao.backup": ("gerou backup", "ok"),
+    "manutencao.limpeza": ("limpeza", "perigo"),
+    "manutencao.restauracao": ("restauração", "perigo"),
+    "usuario.perfil": ("trocou perfil", "info"),
+    "relatorio.pdf": ("gerou PDF", ""),
+    "relatorio.xlsx": ("gerou Excel", ""),
+}
 
 
 @bp.get("/")
@@ -22,6 +38,7 @@ def lista():
     acao = (request.args.get("acao") or "").strip()
     alvo_tipo = (request.args.get("alvo_tipo") or "").strip()
     usuario_id = request.args.get("usuario", type=int)
+    busca = (request.args.get("busca") or "").strip()
 
     if acao:
         consulta = consulta.where(Auditoria.acao == acao)
@@ -29,6 +46,15 @@ def lista():
         consulta = consulta.where(Auditoria.alvo_tipo == alvo_tipo)
     if usuario_id:
         consulta = consulta.where(Auditoria.usuario_id == usuario_id)
+    if busca:
+        # O detalhe é JSON; procurar no texto dele acha referência, arquivo, valor…
+        alvo = curinga(busca)
+        consulta = consulta.where(
+            or_(
+                cast(Auditoria.payload, String).ilike(alvo, escape="\\"),
+                cast(Auditoria.alvo_id, String).like(alvo),
+            )
+        )
 
     pagina = db.paginate(
         consulta,
@@ -51,6 +77,8 @@ def lista():
         filtro_acao=acao,
         filtro_tipo=alvo_tipo,
         filtro_usuario=usuario_id,
+        filtro_busca=busca,
+        rotulos=ROTULOS,
         query_base={
             chave: valor
             for chave, valor in request.args.items()

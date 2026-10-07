@@ -112,6 +112,6 @@ def test_paginacao_da_auditoria(entrar, admin, db):
     primeira = cliente.get("/auditoria/?pagina=1").get_data(as_text=True)
     segunda = cliente.get("/auditoria/?pagina=2").get_data(as_text=True)
     # A celula da tabela, e nao a pagina toda: o combo de filtro tambem cita a acao.
-    assert primeira.count("<td>teste.paginacao</td>") == 60
-    assert segunda.count("<td>teste.paginacao</td>") == 60
+    assert primeira.count('title="teste.paginacao"') == 60
+    assert segunda.count('title="teste.paginacao"') == 60
     assert primeira != segunda
